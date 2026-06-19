@@ -1,0 +1,37 @@
+{
+  "name": "vise-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Moheeb Zara",
+  "description": "VISE Studio: a browser native, local first studio that trains small models and ships a verified int8 .tflite. Built on tensorflow-web. Never published with the library.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.9.0",
+    "fft.js": "^4.0.4",
+    "pinia": "^3.0.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@tensorflow/tfjs-tflite": "^0.0.1-alpha.10",
+    "@types/node": "^26.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^26.0.0",
+    "playwright-core": "^1.61.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9",
+    "vue-tsc": "^3.0.0"
+  }
+}

@@ -1,0 +1,79 @@
+/*
+ * VISE design tokens. The :root block from the VISE design system, verbatim.
+ * Steel surface scale, chalk and ash ink, the single caution accent, patina
+ * secondary, square corners, hard cut shadows, the three typefaces, the hazard
+ * stripe, and motion timing. Nothing here knows about machine learning.
+ */
+:root {
+  /* ----- STEEL (surface scale, recessed to raised) ----- */
+  --void: #0a0c0f;
+  --soot: #0d1015;
+  --iron: #12161c;
+  --graphite: #171c23;
+  --gunmetal: #1d242d;
+  --steel: #222b35;
+
+  /* ----- LINES ----- */
+  --seam: #262d36;
+  --edge: #343d49;
+
+  /* ----- INK ----- */
+  --chalk: #e7ecf1;
+  --steam: #aab3be;
+  --ash: #6c7682;
+  --ghost: #454d58;
+
+  /* ----- LIVE (the one accent: machine caution, powered) ----- */
+  --live: #ccf23e;
+  --live-dim: #8ba125;
+  --live-ink: #0a0c0f;
+  --live-glow: rgba(204, 242, 62, 0.16);
+
+  /* ----- PATINA (cool secondary, structure + info only) ----- */
+  --patina: #56b3c4;
+
+  /* ----- STATUS ----- */
+  --pass: #6fd08c;
+  --amber: #e8b24a;
+  --rust: #e0593f;
+
+  /* ----- TYPE ----- */
+  --f-display: 'Chakra Petch', sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --f-label: 'Space Mono', ui-monospace, monospace;
+
+  --t-xs: 11px;
+  --t-sm: 13px;
+  --t-base: 14px;
+  --t-lg: 18px;
+  --t-xl: 24px;
+  --t-2xl: 34px;
+  --t-3xl: 48px;
+  --t-4xl: 72px;
+
+  /* ----- SPACING (8px base) ----- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* ----- RADIUS (square) ----- */
+  --r: 0;
+  --r-tick: 2px;
+
+  /* ----- SHADOW (hard cut, no blur) ----- */
+  --cut: 4px 4px 0 #05070a;
+  --cut-sm: 2px 2px 0 #05070a;
+  --cut-live: 4px 4px 0 var(--live-dim);
+
+  /* ----- MOTION ----- */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fast: 120ms;
+  --med: 240ms;
+
+  --hazard: repeating-linear-gradient(45deg, var(--live) 0 6px, transparent 6px 12px);
+}

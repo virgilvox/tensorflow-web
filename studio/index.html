@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VISE Studio</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230a0c0f'/%3E%3Crect x='2' y='3' width='2' height='10' fill='%23ccf23e'/%3E%3Crect x='12' y='3' width='2' height='10' fill='%23ccf23e'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="Train a small model in your browser and ship a verified int8 .tflite. Local first, no account, nothing uploaded."
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!--
+      The TensorFlow Lite WASM interpreter is loaded from a CDN as a global
+      script, its supported browser usage, which the Vite optimizer cannot
+      bundle. It exposes a global "tflite" that the library's verify() and the
+      live inference path detect. The interpreter wraps its outputs with a global
+      tf, so tfjs is loaded first. alpha.8 is used because the alpha.10 npm build
+      omits the WASM binaries. Training, calibration, quantization, and export
+      all work without these; only verify and live inference need the interpreter.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.9.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/tf-tflite.min.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
