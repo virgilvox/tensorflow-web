@@ -100,6 +100,28 @@ export function useDataset() {
     }
   }
 
+  /** Adds a motion window sample, persists it, and returns the stored record. */
+  async function addMotionSample(
+    classId: string,
+    sessionId: string,
+    window: { hz: number; axes: number; data: Float32Array },
+  ): Promise<Sample> {
+    const sample = project.addSample({
+      classId,
+      sessionId,
+      payload: { kind: 'motion', hz: window.hz, axes: window.axes, data: window.data },
+    });
+    await persistSample(sample);
+    return sample;
+  }
+
+  /** Adds a text sample, persists it, and returns the stored record. */
+  async function addTextSample(classId: string, sessionId: string, text: string): Promise<Sample> {
+    const sample = project.addSample({ classId, sessionId, payload: { kind: 'text', text } });
+    await persistSample(sample);
+    return sample;
+  }
+
   /** Removes a sample from the store and storage. */
   async function removeSample(id: string): Promise<void> {
     project.removeSample(id);
@@ -140,5 +162,15 @@ export function useDataset() {
     }
   }
 
-  return { init, persistMeta, addImageSample, addAudioSample, removeSample, removeClass, clearAll };
+  return {
+    init,
+    persistMeta,
+    addImageSample,
+    addAudioSample,
+    addMotionSample,
+    addTextSample,
+    removeSample,
+    removeClass,
+    clearAll,
+  };
 }

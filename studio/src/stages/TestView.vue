@@ -18,8 +18,10 @@ import { useTrainingStore } from '../stores/training';
 import { usePipeline } from '../composables/usePipeline';
 import { useCamera, CAPTURE_SIZE } from '../composables/useCamera';
 import { useMicrophone } from '../composables/useMicrophone';
+import { useMotion } from '../composables/useMotion';
 import { fileToFrame } from '../lib/imageDecode';
 import { fileToAudio } from '../lib/audioDecode';
+import { fileToMotion } from '../lib/motionImport';
 import { formatPercent } from '../lib/format';
 
 const project = useProjectStore();
@@ -27,13 +29,16 @@ const training = useTrainingStore();
 const pipeline = usePipeline();
 const camera = useCamera();
 const mic = useMicrophone();
+const motion = useMotion();
 
 const video = useTemplateRef<HTMLVideoElement>('video');
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput');
 const audioInput = useTemplateRef<HTMLInputElement>('audioInput');
+const motionInput = useTemplateRef<HTMLInputElement>('motionInput');
 const predictions = ref<{ name: string; score: number }[]>([]);
 const error = ref<string | null>(null);
 const recording = ref(false);
+const textValue = ref('');
 
 const classNames = computed(() => project.classes.map((c) => c.name));
 const report = computed(() => training.report);
@@ -106,6 +111,49 @@ async function predictAudioFromFile(event: Event): Promise<void> {
     input.value = '';
   }
 }
+
+async function startMotion(): Promise<void> {
+  await motion.start();
+}
+
+async function recordMotionPredict(): Promise<void> {
+  error.value = null;
+  recording.value = true;
+  try {
+    const window = await motion.record();
+    predictions.value = await pipeline.predictMotion(window.data, window.axes);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    recording.value = false;
+  }
+}
+
+async function predictMotionFromFile(event: Event): Promise<void> {
+  error.value = null;
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    const window = await fileToMotion(file);
+    predictions.value = await pipeline.predictMotion(window.data, window.axes);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    input.value = '';
+  }
+}
+
+async function predictTextLive(): Promise<void> {
+  error.value = null;
+  const text = textValue.value.trim();
+  if (!text) return;
+  try {
+    predictions.value = await pipeline.predictText(text);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  }
+}
 </script>
 
 <template>
@@ -146,7 +194,7 @@ async function predictAudioFromFile(event: Event): Promise<void> {
           <p v-if="error" class="err">{{ error }}</p>
         </div>
 
-        <div v-else class="cam">
+        <div v-else-if="project.modality === 'audio'" class="cam">
           <div class="camrow">
             <ViseButton v-if="!mic.active.value" size="sm" @click="startMic">
               <ViseIcon name="mic" :size="13" /> Start microphone
@@ -166,6 +214,44 @@ async function predictAudioFromFile(event: Event): Promise<void> {
               <ViseIcon name="mic" :size="13" /> Predict a clip
             </ViseButton>
           </div>
+          <p v-if="error" class="err">{{ error }}</p>
+        </div>
+
+        <div v-else-if="project.modality === 'motion'" class="cam">
+          <div class="camrow">
+            <ViseButton v-if="!motion.active.value" size="sm" @click="startMotion">
+              <ViseIcon name="motion" :size="13" /> Start sensor
+            </ViseButton>
+            <ViseButton v-else size="sm" :disabled="recording" @click="recordMotionPredict">
+              <ViseIcon name="motion" :size="13" /> {{ recording ? 'Reading...' : 'Record and predict' }}
+            </ViseButton>
+            <input
+              ref="motionInput"
+              type="file"
+              accept="application/json,.json"
+              class="hidden-input"
+              data-test="predict-motion-file"
+              @change="predictMotionFromFile"
+            />
+            <ViseButton variant="ghost" size="sm" @click="motionInput?.click()">
+              <ViseIcon name="motion" :size="13" /> Predict a window
+            </ViseButton>
+          </div>
+          <p v-if="error" class="err">{{ error }}</p>
+        </div>
+
+        <div v-else class="cam textpredict">
+          <textarea
+            v-model="textValue"
+            class="textarea"
+            rows="2"
+            placeholder="Type a phrase to classify."
+            data-test="text-predict-input"
+            @keydown.enter.exact.prevent="predictTextLive"
+          ></textarea>
+          <ViseButton size="sm" :disabled="!textValue.trim()" @click="predictTextLive">
+            <ViseIcon name="play" :size="13" /> Predict
+          </ViseButton>
           <p v-if="error" class="err">{{ error }}</p>
         </div>
 
@@ -237,6 +323,25 @@ async function predictAudioFromFile(event: Event): Promise<void> {
 }
 .hidden-input {
   display: none;
+}
+.textpredict {
+  gap: var(--s-3);
+  min-width: 240px;
+}
+.textarea {
+  width: 100%;
+  background: var(--gunmetal);
+  border: 1px solid var(--seam);
+  color: var(--chalk);
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+.textarea:focus {
+  outline: none;
+  border-color: var(--live);
+  box-shadow: 0 0 0 3px var(--live-glow);
 }
 .reason {
   font-size: 12px;

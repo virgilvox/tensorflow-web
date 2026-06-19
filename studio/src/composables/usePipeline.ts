@@ -18,9 +18,16 @@ import { useQuantizer } from './useQuantizer';
 import { useVerifier } from './useVerifier';
 import { useDeviceBudget } from './useDeviceBudget';
 import { useLiveInference } from './useLiveInference';
-import { defaultFeatureConfig, featureExtractor, featureShape, type FeatureConfig } from '../features';
+import {
+  buildFeatureConfig,
+  featureExtractor,
+  featureShape,
+  type FeatureConfig,
+} from '../features';
 import { imageToFeatures, type RgbaFrame } from '../features/image';
 import { audioToFeatures } from '../features/audio';
+import { motionToFeatures } from '../features/motion';
+import { textToFeatures } from '../features/text';
 import { buildBatchedData } from '../lib/tensors';
 import { sessionAwareSplit } from '../lib/split';
 import { buildModel, summarize } from '../models/builder';
@@ -35,7 +42,7 @@ import type { ModelSummary } from '../models/types';
 export const MIN_PER_CLASS = 5;
 
 /** Modalities whose full pipeline is wired today. */
-const SUPPORTED: ReadonlySet<Modality> = new Set<Modality>(['image', 'audio']);
+const SUPPORTED: ReadonlySet<Modality> = new Set<Modality>(['image', 'audio', 'motion', 'text']);
 
 /**
  * Chooses an architecture for a feature shape: a small CNN for a 2D grid (image
@@ -86,8 +93,11 @@ export function usePipeline() {
   /** Builds a preset model just to report its size for the Model stage. */
   function previewSummary(): ModelSummary | null {
     if (!SUPPORTED.has(project.modality)) return null;
-    const cfg = defaultFeatureConfig(project.modality);
+    const cfg = buildFeatureConfig(project.modality, project.samples);
     const shape = featureShape(cfg);
+    // A data derived shape (text vocabulary) can be empty before any data; the
+    // size estimate only makes sense once the input has a width.
+    if (shape.some((d) => d <= 0)) return null;
     const classCount = Math.max(2, project.classes.length);
     const model = buildModel(presetFor(shape, classCount), shape);
     try {
@@ -117,9 +127,6 @@ export function usePipeline() {
     hasModel.value = false;
     live.reset();
 
-    const cfg = defaultFeatureConfig(project.modality);
-    const shape = featureShape(cfg);
-    const extract = featureExtractor(cfg);
     const ids = project.classes.map((c) => c.id);
 
     // Session aware split, with a random per class fallback if every class has a
@@ -128,6 +135,13 @@ export function usePipeline() {
     if (testSamples.length === 0) {
       ({ trainSamples, testSamples } = randomHoldout(project.samples, 0.25));
     }
+
+    // Build the feature config from the train split only, so a text vocabulary
+    // never sees the held out test set.
+    const cfg = buildFeatureConfig(project.modality, trainSamples);
+    const shape = featureShape(cfg);
+    if (shape.some((d) => d <= 0)) throw new Error('No usable features; add more varied data.');
+    const extract = featureExtractor(cfg);
 
     const trainData = buildBatchedData(trainSamples, ids, extract, shape);
     const testData = buildBatchedData(testSamples, ids, extract, shape);
@@ -205,6 +219,23 @@ export function usePipeline() {
     return toResults(await live.predict(features, fShape.value));
   }
 
+  /** Runs one captured motion window through the live model. */
+  async function predictMotion(
+    data: Float32Array,
+    axes: number,
+  ): Promise<{ name: string; score: number }[]> {
+    if (featureCfg.value?.kind !== 'motion') throw new Error('No motion model; train a motion project first.');
+    const features = motionToFeatures(data, axes, featureCfg.value.motion);
+    return toResults(await live.predict(features, fShape.value));
+  }
+
+  /** Runs one text string through the live model. */
+  async function predictText(text: string): Promise<{ name: string; score: number }[]> {
+    if (featureCfg.value?.kind !== 'text') throw new Error('No text model; train a text project first.');
+    const features = textToFeatures(text, featureCfg.value.text);
+    return toResults(await live.predict(features, fShape.value));
+  }
+
   /** The op resolver calls and input shape a sketch export needs. */
   function exportOps(): { resolverCalls: string[]; inputShape: number[] } {
     const model = trainedModel.value;
@@ -226,6 +257,8 @@ export function usePipeline() {
     exportModel,
     predictImage,
     predictAudio,
+    predictMotion,
+    predictText,
     exportOps,
   };
 }

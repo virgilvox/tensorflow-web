@@ -19,8 +19,10 @@ import { useSettingsStore } from '../stores/settings';
 import { useDataset } from '../composables/useDataset';
 import { useCamera, CAPTURE_SIZE } from '../composables/useCamera';
 import { useMicrophone } from '../composables/useMicrophone';
+import { useMotion } from '../composables/useMotion';
 import { fileToFrame } from '../lib/imageDecode';
 import { fileToAudio } from '../lib/audioDecode';
+import { fileToMotion } from '../lib/motionImport';
 import { MODALITIES, MODALITY_ORDER } from '../lib/modalities';
 import type { Modality } from '../types';
 
@@ -29,17 +31,21 @@ const settings = useSettingsStore();
 const dataset = useDataset();
 const camera = useCamera();
 const mic = useMicrophone();
+const motion = useMotion();
 
 const newClassName = ref('');
 const activeClassId = ref<string | null>(null);
 const importing = ref(false);
 const recording = ref(false);
+const textValue = ref('');
 const cameraSession = ref<string | null>(null);
 const micSession = ref<string | null>(null);
+const motionSession = ref<string | null>(null);
 const info = computed(() => MODALITIES[project.modality]);
 const video = useTemplateRef<HTMLVideoElement>('video');
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput');
 const audioInput = useTemplateRef<HTMLInputElement>('audioInput');
+const motionInput = useTemplateRef<HTMLInputElement>('motionInput');
 
 onMounted(async () => {
   await dataset.init();
@@ -134,6 +140,48 @@ async function onAudioFiles(event: Event): Promise<void> {
     importing.value = false;
     input.value = '';
   }
+}
+
+async function startMotion(): Promise<void> {
+  await motion.start();
+  motionSession.value = newSessionId();
+}
+
+async function recordMotion(): Promise<void> {
+  if (!activeClassId.value || !motionSession.value || recording.value) return;
+  recording.value = true;
+  try {
+    const window = await motion.record();
+    await dataset.addMotionSample(activeClassId.value, motionSession.value, window);
+  } finally {
+    recording.value = false;
+  }
+}
+
+async function onMotionFiles(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const files = input.files ? Array.from(input.files) : [];
+  if (!files.length || !activeClassId.value) return;
+  importing.value = true;
+  const session = newSessionId();
+  try {
+    for (const file of files) {
+      const window = await fileToMotion(file);
+      await dataset.addMotionSample(activeClassId.value, session, window);
+    }
+  } finally {
+    importing.value = false;
+    input.value = '';
+  }
+}
+
+async function addTextExample(): Promise<void> {
+  const text = textValue.value.trim();
+  if (!text || !activeClassId.value) return;
+  // Each typed example is its own capture session, so the split distributes them
+  // cleanly across train and test without leakage.
+  await dataset.addTextSample(activeClassId.value, newSessionId(), text);
+  textValue.value = '';
 }
 
 async function removeClass(id: string): Promise<void> {
@@ -304,10 +352,81 @@ const activeClassName = computed(
           </div>
         </template>
 
-        <p v-else class="note">
-          Capture and import for {{ info.label }} arrive with the {{ info.label }} flow. The split is
-          by capture session, never a random row.
-        </p>
+        <template v-else-if="project.modality === 'motion'">
+          <p class="subhead capture-head">
+            Capture
+            <span v-if="activeClassName" class="into">into {{ activeClassName }}</span>
+          </p>
+          <ViseCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
+            Select a class above, then record two second gesture windows from the device motion
+            sensor or import recorded windows. Add an Idle class for the rest state.
+          </ViseCard>
+          <div v-else class="capture">
+            <div class="cam">
+              <svg v-if="motion.trace.value.length" class="trace" viewBox="0 0 120 48" preserveAspectRatio="none">
+                <polyline
+                  v-for="(axis, ai) in [0, 1, 2]"
+                  :key="ai"
+                  :points="motion.trace.value.map((s, i) => `${(i / 120) * 120},${24 - (s[axis] ?? 0) * 2}`).join(' ')"
+                  :class="`ax ax-${ai}`"
+                />
+              </svg>
+              <div class="camrow">
+                <ViseButton v-if="!motion.active.value" size="sm" @click="startMotion">
+                  <ViseIcon name="motion" :size="13" /> Start sensor
+                </ViseButton>
+                <template v-else>
+                  <ViseButton size="sm" :disabled="recording" @click="recordMotion">
+                    <ViseIcon name="motion" :size="13" /> {{ recording ? 'Recording...' : 'Record 2s' }}
+                  </ViseButton>
+                  <ViseButton size="sm" variant="ghost" @click="motion.stop()">Stop</ViseButton>
+                </template>
+              </div>
+              <p v-if="motion.error.value" class="camerr">{{ motion.error.value }}</p>
+            </div>
+            <div class="import">
+              <input
+                ref="motionInput"
+                type="file"
+                accept="application/json,.json"
+                multiple
+                class="hidden-input"
+                data-test="import-motion"
+                @change="onMotionFiles"
+              />
+              <ViseButton variant="ghost" size="sm" :disabled="importing" @click="motionInput?.click()">
+                <ViseIcon name="motion" :size="13" /> {{ importing ? 'Importing...' : 'Import windows' }}
+              </ViseButton>
+              <p class="hint">JSON windows, one batch is one session.</p>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="project.modality === 'text'">
+          <p class="subhead capture-head">
+            Examples
+            <span v-if="activeClassName" class="into">into {{ activeClassName }}</span>
+          </p>
+          <ViseCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
+            Select a class above, then type or paste example strings into it. Keep classes balanced.
+            Add an Other class for everything else.
+          </ViseCard>
+          <div v-else class="textcap">
+            <textarea
+              v-model="textValue"
+              class="textarea"
+              rows="2"
+              placeholder="Type an example, then Add. One phrase per example."
+              data-test="text-input"
+              @keydown.enter.exact.prevent="addTextExample"
+            ></textarea>
+            <ViseButton size="sm" :disabled="!textValue.trim()" @click="addTextExample">
+              <ViseIcon name="plus" :size="13" /> Add example
+            </ViseButton>
+          </div>
+        </template>
+
+        <p v-else class="note">Capture for {{ info.label }} is not available.</p>
       </div>
 
       <aside class="right">
@@ -513,6 +632,50 @@ const activeClassName = computed(
   color: var(--ash);
   margin: var(--s-2) 0 0;
   max-width: 150px;
+}
+.trace {
+  width: 220px;
+  height: 88px;
+  background: var(--void);
+  border: 1px solid var(--seam);
+  display: block;
+  margin-bottom: var(--s-3);
+}
+.trace .ax {
+  fill: none;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.trace .ax-0 {
+  stroke: var(--live);
+}
+.trace .ax-1 {
+  stroke: var(--patina);
+}
+.trace .ax-2 {
+  stroke: var(--amber);
+}
+.textcap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  align-items: flex-start;
+  max-width: 460px;
+}
+.textarea {
+  width: 100%;
+  background: var(--gunmetal);
+  border: 1px solid var(--seam);
+  color: var(--chalk);
+  font-family: var(--f-mono);
+  font-size: 12.5px;
+  padding: 9px 11px;
+  resize: vertical;
+}
+.textarea:focus {
+  outline: none;
+  border-color: var(--live);
+  box-shadow: 0 0 0 3px var(--live-glow);
 }
 .coach {
   margin: 0;
