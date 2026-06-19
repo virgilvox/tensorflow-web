@@ -139,16 +139,21 @@ Early. Pre 1.0, but the core promise is verified end to end. Two test layers cov
 
 Together these verify the whole op registry numerically against the real interpreter: CONV_2D with valid and same padding, DEPTHWISE_CONV_2D, pointwise CONV_2D, FULLY_CONNECTED, MAX_POOL_2D, AVERAGE_POOL_2D, global average pooling (MEAN), RESHAPE, ADD, SOFTMAX, LOGISTIC, and fused ReLU. The op registry grows one converter at a time, and the public types are stable.
 
+The same emitted `.tflite` is also run through a native Node TFLite runtime (`npm run test:node-tflite`), so the file is confirmed portable across two independent interpreters, the browser WASM build and the TensorFlow Lite C++ library, with the model's accuracy intact in both.
+
 ## Testing
 
 ```sh
-npm test            # Node unit tests (Vitest): math, serialization, pipeline
-npm run test:parity # browser parity against the real TFLite interpreter
-npm run typecheck   # strict TypeScript, library and tooling
-npm run build       # bundle to dist (ESM plus type declarations)
+npm test                 # Node unit tests (Vitest): math, serialization, pipeline
+npm run test:parity      # browser parity against the real TFLite WASM interpreter
+npm run test:node-tflite # run the emitted .tflite in a native Node TFLite runtime
+npm run typecheck        # strict TypeScript, library and tooling
+npm run build            # bundle to dist (ESM plus type declarations)
 ```
 
-`npm run test:parity` starts the Vite dev server, drives `app/parity.html` in a headless Chromium through Playwright, and loads the emitted `.tflite` files into the actual TensorFlow Lite WASM interpreter. It needs a local Chrome or Chromium and network access for the interpreter's WASM. The unit tests need neither and run anywhere Node does.
+`npm run test:parity` starts the Vite dev server, drives `app/parity.html` in a headless Chromium through Playwright, and loads the emitted `.tflite` files into the actual TensorFlow Lite WASM interpreter. It needs a local Chrome or Chromium and network access for the interpreter's WASM.
+
+`npm run test:node-tflite` trains a model, writes a real `.tflite` file to disk, and loads it back with `tfjs-tflite-node`, the TensorFlow Lite C++ library bound to Node. The same file running in both the browser WASM interpreter and the native C++ library is the portability proof: the output is a standard `.tflite`, not something tied to this library. The unit tests need neither a browser nor a native build and run anywhere Node does.
 
 ## Development
 

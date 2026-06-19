@@ -1,6 +1,6 @@
 {
   "name": "tensorflow-web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Train a TensorFlow model in the browser tab and emit a verified .tflite. Headless, framework free, int8 quantization included.",
   "type": "module",
   "license": "Apache-2.0",
@@ -24,7 +24,9 @@
     "browser",
     "flatbuffers"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "**/ops/**"
+  ],
   "files": [
     "dist"
   ],
@@ -44,6 +46,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:parity": "node scripts/run-parity.mjs",
+    "test:node-tflite": "npm run build && node scripts/run-node-inference.mjs",
     "app": "vite",
     "lint": "tsc --noEmit"
   },
@@ -64,6 +67,7 @@
     "@types/node": "^26.0.0",
     "@vitest/coverage-v8": "^4.1.9",
     "playwright-core": "^1.61.0",
+    "tfjs-tflite-node": "^0.0.2",
     "tsup": "^8.5.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
