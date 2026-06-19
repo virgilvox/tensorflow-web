@@ -1,10 +1,18 @@
 {
   "name": "tensorflow-web",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Train a TensorFlow model in the browser tab and emit a verified .tflite. Headless, framework free, int8 quantization included.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Moheeb Zara",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/virgilvox/tensorflow-web.git"
+  },
+  "homepage": "https://github.com/virgilvox/tensorflow-web#readme",
+  "bugs": {
+    "url": "https://github.com/virgilvox/tensorflow-web/issues"
+  },
   "keywords": [
     "tensorflow",
     "tflite",
@@ -31,6 +39,7 @@
   "scripts": {
     "gen:schema": "tsx scripts/gen-schema.ts",
     "build": "tsup",
+    "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run",
     "test:watch": "vitest",
