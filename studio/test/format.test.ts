@@ -19,8 +19,8 @@ describe('formatBytes', () => {
   });
 
   it('returns a placeholder for invalid input', () => {
-    expect(formatBytes(-1)).toBe('—');
-    expect(formatBytes(NaN)).toBe('—');
+    expect(formatBytes(-1)).toBe('·');
+    expect(formatBytes(NaN)).toBe('·');
   });
 });
 
@@ -32,7 +32,7 @@ describe('formatPercent', () => {
   });
 
   it('returns a placeholder for non finite input', () => {
-    expect(formatPercent(Infinity)).toBe('—');
+    expect(formatPercent(Infinity)).toBe('·');
   });
 });
 
@@ -42,7 +42,7 @@ describe('formatFixed', () => {
   });
 
   it('returns a placeholder for missing or NaN values', () => {
-    expect(formatFixed(undefined)).toBe('—');
-    expect(formatFixed(NaN)).toBe('—');
+    expect(formatFixed(undefined)).toBe('·');
+    expect(formatFixed(NaN)).toBe('·');
   });
 });

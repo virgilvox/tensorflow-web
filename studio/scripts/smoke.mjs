@@ -90,9 +90,9 @@ try {
     // state both persist (a full reload would reset the store to Guided).
     await page.getByRole('radio', { name: 'Expert' }).click();
     await page.getByRole('link', { name: /Model/ }).click();
-    await page.getByText('Layer editor', { exact: true }).first().waitFor({ timeout: 8000 });
+    await page.getByText('Operator inspector', { exact: true }).first().waitFor({ timeout: 8000 });
     const modelText = await page.textContent('main');
-    check('Expert exposes layer editor on Model', /Layer editor/i.test(modelText ?? ''));
+    check('Expert exposes the operator inspector on Model', /Operator inspector/i.test(modelText ?? ''));
 
     // The supported layer list is read live from the library.
     check('library layer set surfaced', /Conv2D/.test(modelText ?? '') && /Dense/.test(modelText ?? ''));

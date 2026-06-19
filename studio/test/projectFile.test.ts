@@ -1,0 +1,56 @@
+import { describe, it, expect } from 'vitest';
+import { serializeProject, parseProject } from '../src/lib/projectFile';
+import type { Sample } from '../src/types';
+
+const imageSample: Sample = {
+  id: 's1',
+  classId: 'c1',
+  sessionId: 'sess1',
+  createdAt: 1,
+  payload: { kind: 'image', width: 2, height: 1, data: new Uint8ClampedArray([1, 2, 3, 4, 5, 6, 7, 8]) },
+};
+
+const textSample: Sample = {
+  id: 's2',
+  classId: 'c2',
+  sessionId: 'sess2',
+  createdAt: 2,
+  payload: { kind: 'text', text: 'hello world' },
+};
+
+describe('project file round trip', () => {
+  it('serializes and parses a project without loss', () => {
+    const state = {
+      name: 'my project',
+      modality: 'image' as const,
+      classes: [
+        { id: 'c1', name: 'A', negative: false },
+        { id: 'c2', name: 'Other', negative: true },
+      ],
+      samples: [imageSample, textSample],
+    };
+    const file = serializeProject(state);
+    // The on disk form holds plain arrays, not typed arrays.
+    expect(file.version).toBe(1);
+    expect(Array.isArray((file.samples[0]!.payload as { data: number[] }).data)).toBe(true);
+
+    // Round trip through JSON, as a real save and load would.
+    const restored = parseProject(JSON.parse(JSON.stringify(file)));
+    expect(restored.name).toBe('my project');
+    expect(restored.classes).toHaveLength(2);
+    expect(restored.samples).toHaveLength(2);
+    const img = restored.samples[0]!.payload;
+    expect(img.kind).toBe('image');
+    if (img.kind === 'image') {
+      expect(img.data).toBeInstanceOf(Uint8ClampedArray);
+      expect(Array.from(img.data)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    }
+    expect(restored.samples[1]!.payload).toEqual({ kind: 'text', text: 'hello world' });
+  });
+
+  it('rejects input that is not a project file', () => {
+    expect(() => parseProject({ hello: 'world' })).toThrow();
+    expect(() => parseProject({ version: 2, classes: [], samples: [] })).toThrow();
+    expect(() => parseProject(null)).toThrow();
+  });
+});

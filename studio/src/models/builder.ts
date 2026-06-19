@@ -100,6 +100,34 @@ export function assertExportable(model: tf.LayersModel): void {
   }
 }
 
+/** One row of the operator inspector: a layer and its exported shape and size. */
+export interface LayerInfo {
+  name: string;
+  className: string;
+  outputShape: string;
+  params: number;
+}
+
+/**
+ * Describes a model's layers for the Expert operator inspector: the class name
+ * (which is also the export op key), the output shape, and the parameter count.
+ * The InputLayer is omitted, matching what the export path walks.
+ */
+export function describeLayers(model: tf.LayersModel): LayerInfo[] {
+  return model.layers
+    .filter((l) => l.getClassName() !== 'InputLayer')
+    .map((l) => {
+      const out = l.outputShape;
+      const shape = (Array.isArray(out[0]) ? out[0] : out) as Array<number | null>;
+      return {
+        name: l.name,
+        className: l.getClassName(),
+        outputShape: `[${shape.map((d) => d ?? 1).join(', ')}]`,
+        params: l.countParams(),
+      };
+    });
+}
+
 /** Product of a shape's dimensions, treating a null batch dimension as 1. */
 function shapeElems(shape: Array<number | null>): number {
   return shape.reduce<number>((n, d) => n * (d ?? 1), 1);

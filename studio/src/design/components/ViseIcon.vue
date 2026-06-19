@@ -42,6 +42,8 @@ const PATHS: Record<string, string> = {
   image: 'M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6',
   gauge: 'M4 18a8 8 0 0 1 16 0M12 18l4-5',
   warn: 'M12 4l9 16H3zM12 10v4M12 17v.5',
+  open: 'M3 7h6l2 2h10v9H3zM3 7v11',
+  save: 'M5 3h11l3 3v15H5zM8 3v5h7M8 14h8',
 };
 
 const path = computed(() => PATHS[props.name] ?? '');

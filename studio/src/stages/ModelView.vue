@@ -17,6 +17,7 @@ import { usePipeline } from '../composables/usePipeline';
 import { MODALITIES } from '../lib/modalities';
 import { formatBytes } from '../lib/format';
 import type { ModelSummary } from '../models/types';
+import type { LayerInfo } from '../models/builder';
 
 const project = useProjectStore();
 const settings = useSettingsStore();
@@ -26,15 +27,20 @@ const info = computed(() => MODALITIES[project.modality]);
 // The twelve exportable layers, read from the library registry, not hard coded.
 const layers = supportedLayers().slice().sort();
 
-// A live size estimate from the preset model, rebuilt as the class count changes.
+// A live size estimate and operator list from the preset model, rebuilt as the
+// class count and the data change.
 const summary = ref<ModelSummary | null>(null);
+const opLayers = ref<LayerInfo[]>([]);
 watchEffect(() => {
-  // Reference the class count so the estimate refreshes when classes change.
+  // Reference the data so the estimate refreshes when classes or samples change.
   void project.classes.length;
+  void project.samples.length;
   try {
     summary.value = pipeline.previewSummary();
+    opLayers.value = pipeline.inspectLayers();
   } catch {
     summary.value = null;
+    opLayers.value = [];
   }
 });
 </script>
@@ -68,9 +74,25 @@ watchEffect(() => {
       </div>
     </ViseCard>
 
-    <ViseCard v-if="settings.expert" title="Layer editor" meta="expert" accent class="mt">
-      The Expert layer editor builds the network from the supported operators above and refuses to
-      add any other, mirroring the export guard. It arrives with the flagship image flow.
+    <ViseCard v-if="settings.expert && opLayers.length" title="Operator inspector" meta="expert" accent class="mt">
+      <table class="ops">
+        <thead>
+          <tr><th>#</th><th>operator</th><th>output shape</th><th>params</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="(l, i) in opLayers" :key="l.name">
+            <td class="mono-num">{{ i + 1 }}</td>
+            <td>{{ l.className }}</td>
+            <td class="mono-num">{{ l.outputShape }}</td>
+            <td class="mono-num">{{ l.params.toLocaleString() }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="reason mt">
+        Every operator above is one the export registry supports. The auto architecture is sized to
+        your data and target; a full layer editor that builds only from these operators is the
+        deferred Expert stretch.
+      </p>
     </ViseCard>
 
     <p v-if="!settings.showsConfigStages" class="guided">
@@ -126,6 +148,27 @@ watchEffect(() => {
 }
 .mt {
   margin-top: var(--s-4);
+}
+.ops {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+}
+.ops th {
+  text-align: left;
+  font-family: var(--f-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 8.5px;
+  color: var(--ash);
+  border-bottom: 1px solid var(--seam);
+  padding: 6px 10px 6px 0;
+}
+.ops td {
+  color: var(--steam);
+  border-bottom: 1px solid var(--seam);
+  padding: 6px 10px 6px 0;
 }
 .guided {
   font-size: 12px;

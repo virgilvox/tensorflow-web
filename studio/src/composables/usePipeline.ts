@@ -30,7 +30,7 @@ import { motionToFeatures } from '../features/motion';
 import { textToFeatures } from '../features/text';
 import { buildBatchedData } from '../lib/tensors';
 import { sessionAwareSplit } from '../lib/split';
-import { buildModel, summarize } from '../models/builder';
+import { buildModel, summarize, describeLayers, type LayerInfo } from '../models/builder';
 import { imageCnnPreset, mlpPreset } from '../models/presets';
 import type { ModelSpec } from '../models/types';
 import type { Modality } from '../types';
@@ -102,6 +102,20 @@ export function usePipeline() {
     const model = buildModel(presetFor(shape, classCount), shape);
     try {
       return summarize(model);
+    } finally {
+      model.dispose();
+    }
+  }
+
+  /** Describes the preset model's layers for the Expert operator inspector. */
+  function inspectLayers(): LayerInfo[] {
+    if (!SUPPORTED.has(project.modality)) return [];
+    const cfg = buildFeatureConfig(project.modality, project.samples);
+    const shape = featureShape(cfg);
+    if (shape.some((d) => d <= 0)) return [];
+    const model = buildModel(presetFor(shape, Math.max(2, project.classes.length)), shape);
+    try {
+      return describeLayers(model);
     } finally {
       model.dispose();
     }
@@ -252,6 +266,7 @@ export function usePipeline() {
     hasModel,
     canTrain,
     previewSummary,
+    inspectLayers,
     train,
     cancel: trainer.cancel,
     exportModel,

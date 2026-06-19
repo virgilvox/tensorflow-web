@@ -95,7 +95,7 @@ const latestAcc = computed(() => training.latest?.acc);
       <ViseGauge
         label="Accuracy"
         :fraction="latestAcc ?? 0"
-        :value="latestAcc === undefined ? '—' : formatPercent(latestAcc)"
+        :value="latestAcc === undefined ? '·' : formatPercent(latestAcc)"
       />
     </div>
 

@@ -25,18 +25,27 @@ interface ProjectMeta {
   classes: ClassDef[];
 }
 
+// Module level so the one time load survives stage view remounts: the store
+// outlives any single view, so reloading from storage on every mount would
+// clobber in memory edits (and a just imported project) with stale data.
+let loadedOnce = false;
+
 export function useDataset() {
   const project = useProjectStore();
 
-  /** Loads any persisted project and samples into the store. Safe to call once. */
+  /** Loads any persisted project and samples into the store once per session. */
   async function init(): Promise<void> {
-    if (!storageAvailable()) return;
+    if (loadedOnce || !storageAvailable()) return;
+    loadedOnce = true;
     try {
       const [metas, samples] = await Promise.all([
         getAll<ProjectMeta>(STORES.meta),
         getAll<Sample>(STORES.samples),
       ]);
       const meta = metas.find((m) => m.key === 'project');
+      // Nothing persisted yet: leave the store as is. This also avoids an
+      // in flight init from clobbering a project the user just imported.
+      if (!meta && samples.length === 0) return;
       project.load({
         name: meta?.name,
         modality: meta?.modality,

@@ -5,15 +5,32 @@
  * device selector the budget meter checks against, and the loud local only
  * indicator stating that nothing leaves the browser.
  */
-import { computed } from 'vue';
+import { computed, useTemplateRef } from 'vue';
 import ViseSegmented from './ViseSegmented.vue';
 import ViseIcon from './ViseIcon.vue';
 import { useSettingsStore, TARGET_DEVICES } from '../../stores/settings';
 import { useProjectStore } from '../../stores/project';
+import { useProjectFile } from '../../composables/useProjectFile';
+import { useDataset } from '../../composables/useDataset';
 import type { AltitudeLevel, TargetDeviceId } from '../../types';
 
 const settings = useSettingsStore();
 const project = useProjectStore();
+const projectFile = useProjectFile();
+const dataset = useDataset();
+const importInput = useTemplateRef<HTMLInputElement>('importInput');
+
+async function onRename(event: Event): Promise<void> {
+  project.name = (event.target as HTMLInputElement).value || 'untitled';
+  await dataset.persistMeta();
+}
+
+async function onImport(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) await projectFile.importFromFile(file);
+  input.value = '';
+}
 
 const ALTITUDES: ReadonlyArray<{ value: AltitudeLevel; label: string }> = [
   { value: 'guided', label: 'Guided' },
@@ -45,9 +62,24 @@ function onTargetChange(event: Event): void {
     </div>
 
     <div class="right">
-      <div class="project" :title="`Project: ${project.name}`">
+      <div class="project">
         <span class="lab cap">Project</span>
-        <span class="pname">{{ project.name }}</span>
+        <div class="prow">
+          <input
+            class="pname"
+            :value="project.name"
+            aria-label="Project name"
+            spellcheck="false"
+            @change="onRename"
+          />
+          <button class="picon" type="button" aria-label="Export project to a file" title="Export project" @click="projectFile.exportToFile()">
+            <ViseIcon name="save" :size="14" />
+          </button>
+          <button class="picon" type="button" aria-label="Import project from a file" title="Import project" @click="importInput?.click()">
+            <ViseIcon name="open" :size="14" />
+          </button>
+          <input ref="importInput" type="file" accept=".json,application/json" class="hidden" data-test="import-project" @change="onImport" />
+        </div>
       </div>
 
       <label class="device">
@@ -135,14 +167,40 @@ function onTargetChange(event: Event): void {
   flex-direction: column;
   gap: 3px;
 }
+.prow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .pname {
   font-family: var(--f-mono);
   font-size: var(--t-sm);
   color: var(--chalk);
-  max-width: 16ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: var(--gunmetal);
+  border: 1px solid var(--seam);
+  padding: 3px 7px;
+  width: 13ch;
+}
+.pname:focus {
+  outline: none;
+  border-color: var(--live);
+  box-shadow: 0 0 0 3px var(--live-glow);
+}
+.picon {
+  display: inline-flex;
+  background: none;
+  border: 1px solid var(--seam);
+  color: var(--ash);
+  padding: 4px;
+  cursor: pointer;
+  transition: color var(--fast), border-color var(--fast);
+}
+.picon:hover {
+  color: var(--live);
+  border-color: var(--live-dim);
+}
+.hidden {
+  display: none;
 }
 .device select {
   background: var(--gunmetal);

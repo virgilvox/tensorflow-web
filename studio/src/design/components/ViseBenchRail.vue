@@ -33,7 +33,7 @@ const jobState = computed(() => {
 });
 
 const modelSize = computed(() =>
-  training.tfliteBytes === null ? '—' : formatBytes(training.tfliteBytes),
+  training.tfliteBytes === null ? '·' : formatBytes(training.tfliteBytes),
 );
 
 const fit = computed(() => {

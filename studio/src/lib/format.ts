@@ -9,7 +9,7 @@
  *   plain integer with a "B" suffix.
  */
 export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '—';
+  if (!Number.isFinite(bytes) || bytes < 0) return '·';
   if (bytes < 1024) return `${Math.round(bytes)} B`;
   const units = ['KB', 'MB', 'GB'];
   let value = bytes / 1024;
@@ -27,7 +27,7 @@ export function formatBytes(bytes: number): string {
  * @returns a string like "94%", or an em space placeholder for non finite input.
  */
 export function formatPercent(fraction: number): string {
-  if (!Number.isFinite(fraction)) return '—';
+  if (!Number.isFinite(fraction)) return '·';
   return `${Math.round(fraction * 100)}%`;
 }
 
@@ -38,6 +38,6 @@ export function formatPercent(fraction: number): string {
  * @returns the fixed string, or an em space placeholder.
  */
 export function formatFixed(value: number | undefined, digits = 4): string {
-  if (value === undefined || Number.isNaN(value)) return '—';
+  if (value === undefined || Number.isNaN(value)) return '·';
   return value.toFixed(digits);
 }
