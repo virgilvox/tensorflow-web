@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tensorflow-web</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header class="masthead">
+        <h1>tensorflow-web</h1>
+        <p class="lede">
+          Train a small convolutional model in this tab, quantize it to int8,
+          emit a real .tflite, and verify the emitted file against the float
+          reference. No network. No external assets. The dataset is generated
+          on the fly.
+        </p>
+      </header>
+
+      <div class="columns">
+        <section class="controls" aria-label="Controls">
+          <h2>Pipeline</h2>
+
+          <fieldset>
+            <legend>Dataset</legend>
+            <label for="shapes">Classes</label>
+            <p id="shapes" class="static-value">square, disc, ring</p>
+            <label for="sample-count">Samples per class</label>
+            <input id="sample-count" type="number" min="20" max="400" step="20" value="120" />
+            <label for="image-size">Image size (px)</label>
+            <input id="image-size" type="number" min="8" max="32" step="4" value="16" />
+          </fieldset>
+
+          <fieldset>
+            <legend>Training</legend>
+            <label for="epochs">Epochs</label>
+            <input id="epochs" type="number" min="1" max="50" step="1" value="12" />
+            <label for="batch-size">Batch size</label>
+            <input id="batch-size" type="number" min="8" max="128" step="8" value="32" />
+          </fieldset>
+
+          <fieldset>
+            <legend>Quantization</legend>
+            <label for="tolerance">Parity tolerance</label>
+            <input id="tolerance" type="number" min="0" max="1" step="0.01" value="0.1" />
+          </fieldset>
+
+          <div class="actions">
+            <button id="run" type="button">Run pipeline</button>
+            <button id="download" type="button" disabled>Download .tflite</button>
+          </div>
+
+          <p id="status" class="status" role="status" aria-live="polite">Idle.</p>
+        </section>
+
+        <section class="readout" aria-label="Readout">
+          <h2>Training</h2>
+          <div class="metric-row">
+            <span class="metric-label">Epoch</span>
+            <span id="epoch-value" class="metric-value">&mdash;</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Loss</span>
+            <span id="loss-value" class="metric-value">&mdash;</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Accuracy</span>
+            <span id="acc-value" class="metric-value">&mdash;</span>
+          </div>
+          <pre id="loss-log" class="log" aria-label="Per epoch loss"></pre>
+
+          <h2>Verify report</h2>
+          <pre id="report" class="log" aria-label="Verify report">No report yet.</pre>
+        </section>
+      </div>
+    </main>
+    <!--
+      The TensorFlow Lite WASM interpreter is loaded from a CDN as a script tag,
+      which is its supported browser usage and which the Vite optimizer cannot
+      bundle. It exposes a global "tflite" that the library's verify() detects
+      and uses. Training, calibration, quantization, and export work without it;
+      only the verify step needs it.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.10/dist/tf-tflite.min.js"></script>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

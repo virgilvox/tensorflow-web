@@ -1,0 +1,17 @@
+tensorflow-web
+Copyright 2026 Moheeb Zara and the tensorflow-web contributors
+
+This product is licensed under the Apache License, Version 2.0.
+You may obtain a copy of the License in the LICENSE file or at
+http://www.apache.org/licenses/LICENSE-2.0
+
+This library interoperates with the TensorFlow Lite FlatBuffers schema and
+the following projects, each licensed under the Apache License, Version 2.0:
+
+  TensorFlow and TensorFlow.js   https://github.com/tensorflow/tfjs
+  TensorFlow Lite (tfjs-tflite)  https://github.com/tensorflow/tfjs
+  FlatBuffers                    https://github.com/google/flatbuffers
+
+These projects are not distributed as part of this library. They are
+peer or development dependencies. See the README credits section for the
+full list of work that informed this library.

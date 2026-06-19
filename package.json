@@ -1,0 +1,64 @@
+{
+  "name": "tensorflow-web",
+  "version": "0.0.0",
+  "description": "Train a TensorFlow model in the browser tab and emit a verified .tflite. Headless, framework free, int8 quantization included.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Moheeb Zara",
+  "keywords": [
+    "tensorflow",
+    "tflite",
+    "tensorflow-lite",
+    "quantization",
+    "int8",
+    "edge-ml",
+    "tinyml",
+    "browser",
+    "flatbuffers"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "gen:schema": "tsx scripts/gen-schema.ts",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:parity": "node scripts/run-parity.mjs",
+    "app": "vite",
+    "lint": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@tensorflow/tfjs": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@tensorflow/tfjs-tflite": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "flatbuffers": "^25.9.23"
+  },
+  "devDependencies": {
+    "@tensorflow/tfjs": "^4.9.0",
+    "@tensorflow/tfjs-tflite": "^0.0.1-alpha.10",
+    "@types/node": "^26.0.0",
+    "@vitest/coverage-v8": "^4.1.9",
+    "playwright-core": "^1.61.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
+  }
+}

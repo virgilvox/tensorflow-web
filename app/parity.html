@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tensorflow-web parity</title>
+  </head>
+  <body>
+    <pre id="out">running parity check...</pre>
+    <!--
+      The TensorFlow Lite WASM interpreter, loaded from a CDN as a script tag.
+      It exposes the global "tflite" that verify() uses to run the emitted file.
+      This page exists for the automated browser parity test (scripts/run-parity.mjs).
+    -->
+    <!-- The interpreter wraps its outputs with a global tf (tfjs-core), so load it first. -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.9.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/tf-tflite.min.js"></script>
+    <script type="module" src="./parity.ts"></script>
+  </body>
+</html>

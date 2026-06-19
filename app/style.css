@@ -1,0 +1,219 @@
+/*
+ * Minimalist, calm interface in the spirit of processing.org. Near-black text
+ * on near-white, one restrained accent, generous whitespace, a clear type
+ * scale, no gradients, no shadows, no icons.
+ */
+
+:root {
+  --ink: #1a1a1a;
+  --paper: #fcfcfa;
+  --muted: #6b6b6b;
+  --rule: #d8d8d4;
+  --accent: #0b5cad;
+  --field: #ffffff;
+  --space: 1.5rem;
+  --measure: 34rem;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: calc(var(--space) * 2.5) var(--space) calc(var(--space) * 4);
+}
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: var(--space);
+  margin-bottom: calc(var(--space) * 2);
+}
+
+h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5rem;
+}
+
+h2 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0 0 var(--space);
+}
+
+.lede {
+  max-width: var(--measure);
+  margin: 0;
+  color: var(--muted);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+  gap: calc(var(--space) * 2);
+  align-items: start;
+}
+
+@media (max-width: 48rem) {
+  .columns {
+    grid-template-columns: 1fr;
+    gap: calc(var(--space) * 1.5);
+  }
+}
+
+fieldset {
+  border: none;
+  border-top: 1px solid var(--rule);
+  padding: var(--space) 0 0;
+  margin: 0 0 var(--space);
+}
+
+legend {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 0 0.5rem 0 0;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  margin: var(--space) 0 0.35rem;
+}
+
+fieldset > label:first-of-type {
+  margin-top: 0.75rem;
+}
+
+input[type="number"] {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  padding: 0.45rem 0.55rem;
+}
+
+input[type="number"]:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.static-value {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  margin: 0;
+  color: var(--ink);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: calc(var(--space) * 1.25) 0 var(--space);
+}
+
+button {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+}
+
+button#run {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+button#run:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 0;
+  min-height: 1.4em;
+}
+
+.status[data-state="error"] {
+  color: #a23030;
+}
+
+.status[data-state="done"] {
+  color: var(--accent);
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--rule);
+  padding: 0.55rem 0;
+}
+
+.metric-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.metric-value {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+}
+
+.log {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--rule);
+  padding: var(--space);
+  margin: var(--space) 0 calc(var(--space) * 2);
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 22rem;
+  overflow-y: auto;
+}
