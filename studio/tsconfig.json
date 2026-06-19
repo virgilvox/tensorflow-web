@@ -17,7 +17,8 @@
     "jsx": "preserve",
     "types": ["node", "vite/client"],
     "paths": {
-      "tensorflow-web": ["../src/index.ts"]
+      "tensorflow-web": ["../src/index.ts"],
+      "@tensorflow/tfjs": ["./node_modules/@tensorflow/tfjs"]
     }
   },
   "include": [

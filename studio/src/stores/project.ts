@@ -7,11 +7,13 @@
 import { defineStore } from 'pinia';
 import type { ClassDef, Modality, Sample } from '../types';
 
-let idCounter = 0;
-/** Monotonic id source. Avoids Math.random so ids stay stable and ordered. */
+/** A unique id that survives a reload, so persisted records never collide. */
 function nextId(prefix: string): string {
-  idCounter += 1;
-  return `${prefix}-${idCounter}`;
+  const uuid =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+  return `${prefix}-${uuid}`;
 }
 
 /** The auto offered negative class label per modality. */
@@ -69,9 +71,19 @@ export const useProjectStore = defineStore('project', {
       return this.addClass(NEGATIVE_LABEL[this.modality], true);
     },
     addSample(sample: Omit<Sample, 'id' | 'createdAt'>): Sample {
-      const full: Sample = { ...sample, id: nextId('sample'), createdAt: idCounter };
+      const full: Sample = { ...sample, id: nextId('sample'), createdAt: Date.now() };
       this.samples.push(full);
       return full;
+    },
+    removeSample(id: string): void {
+      this.samples = this.samples.filter((s) => s.id !== id);
+    },
+    /** Replaces the in memory state, used when loading a persisted project. */
+    load(state: { name?: string; modality?: Modality; classes?: ClassDef[]; samples?: Sample[] }): void {
+      if (state.name !== undefined) this.name = state.name;
+      if (state.modality !== undefined) this.modality = state.modality;
+      if (state.classes) this.classes = state.classes;
+      if (state.samples) this.samples = state.samples;
     },
     reset(): void {
       this.classes = [];

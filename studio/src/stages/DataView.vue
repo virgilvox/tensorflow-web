@@ -1,38 +1,110 @@
 <script setup lang="ts">
 /**
  * Data stage. Choose the modality, manage the class list including the
- * scaffolded negative class, and see per class counts. Capture and import for
- * each modality land with that modality's phase; this stage owns the class model
- * and the coaching that frames good data collection.
+ * scaffolded negative class, capture from the webcam or import image files, and
+ * see per class counts. The split is by capture session, so each camera session
+ * and each import batch gets its own session id and is never split across train
+ * and test. Capture for the other modalities lands with their phases.
  */
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, useTemplateRef } from 'vue';
 import ViseSectionHead from '../design/components/ViseSectionHead.vue';
 import ViseCard from '../design/components/ViseCard.vue';
 import ViseButton from '../design/components/ViseButton.vue';
 import ViseBadge from '../design/components/ViseBadge.vue';
 import ViseField from '../design/components/ViseField.vue';
 import ViseIcon from '../design/components/ViseIcon.vue';
+import ViseStatus from '../design/components/ViseStatus.vue';
 import { useProjectStore } from '../stores/project';
 import { useSettingsStore } from '../stores/settings';
+import { useDataset } from '../composables/useDataset';
+import { useCamera, CAPTURE_SIZE } from '../composables/useCamera';
+import { fileToFrame } from '../lib/imageDecode';
 import { MODALITIES, MODALITY_ORDER } from '../lib/modalities';
 import type { Modality } from '../types';
 
 const project = useProjectStore();
 const settings = useSettingsStore();
+const dataset = useDataset();
+const camera = useCamera();
 
 const newClassName = ref('');
+const activeClassId = ref<string | null>(null);
+const importing = ref(false);
+const cameraSession = ref<string | null>(null);
 const info = computed(() => MODALITIES[project.modality]);
+const video = useTemplateRef<HTMLVideoElement>('video');
+const fileInput = useTemplateRef<HTMLInputElement>('fileInput');
+
+onMounted(async () => {
+  await dataset.init();
+  if (!activeClassId.value && project.classes.length) {
+    activeClassId.value = project.classes[0]!.id;
+  }
+});
+
+function newSessionId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? `session-${crypto.randomUUID()}`
+    : `session-${Date.now()}`;
+}
 
 function pickModality(m: Modality): void {
   project.setModality(m);
+  void dataset.persistMeta();
 }
 
-function addClass(): void {
+async function addClass(): Promise<void> {
   const name = newClassName.value.trim();
   if (!name) return;
-  project.addClass(name);
+  const cls = project.addClass(name);
+  activeClassId.value = cls.id;
   newClassName.value = '';
+  await dataset.persistMeta();
 }
+
+async function ensureNegative(): Promise<void> {
+  const cls = project.ensureNegativeClass();
+  activeClassId.value = cls.id;
+  await dataset.persistMeta();
+}
+
+async function startCamera(): Promise<void> {
+  if (!video.value) return;
+  await camera.start(video.value);
+  cameraSession.value = newSessionId();
+}
+
+async function captureFrame(): Promise<void> {
+  if (!activeClassId.value || !cameraSession.value) return;
+  const frame = camera.capture();
+  if (frame) await dataset.addImageSample(activeClassId.value, cameraSession.value, frame);
+}
+
+async function onFiles(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const files = input.files ? Array.from(input.files) : [];
+  if (!files.length || !activeClassId.value) return;
+  importing.value = true;
+  const session = newSessionId();
+  try {
+    for (const file of files) {
+      const frame = await fileToFrame(file, CAPTURE_SIZE);
+      await dataset.addImageSample(activeClassId.value, session, frame);
+    }
+  } finally {
+    importing.value = false;
+    input.value = '';
+  }
+}
+
+async function removeClass(id: string): Promise<void> {
+  await dataset.removeClass(id);
+  if (activeClassId.value === id) activeClassId.value = project.classes[0]?.id ?? null;
+}
+
+const activeClassName = computed(
+  () => project.classes.find((c) => c.id === activeClassId.value)?.name ?? null,
+);
 </script>
 
 <template>
@@ -76,33 +148,83 @@ function addClass(): void {
             A {{ info.negative }} class catches everything that is none of your classes. It is a
             first class step, not an afterthought.
           </span>
-          <ViseButton size="sm" variant="ghost" @click="project.ensureNegativeClass()">
+          <ViseButton size="sm" variant="ghost" @click="ensureNegative">
             Add {{ info.negative }}
           </ViseButton>
         </div>
 
         <ul v-if="project.classes.length" class="classlist">
           <li v-for="c in project.classes" :key="c.id">
-            <ViseCard :accent="c.negative">
-              <div class="classrow">
-                <span class="cname">
-                  {{ c.name }}
-                  <ViseBadge v-if="c.negative" variant="auto">negative</ViseBadge>
-                </span>
-                <span class="ccount mono-num">{{ project.countsByClass[c.id] ?? 0 }} samples</span>
-                <button class="del" type="button" :aria-label="`Remove ${c.name}`" @click="project.removeClass(c.id)">
-                  <ViseIcon name="trash" :size="14" />
-                </button>
-              </div>
-            </ViseCard>
+            <button
+              type="button"
+              class="classbtn"
+              :class="{ active: c.id === activeClassId }"
+              @click="activeClassId = c.id"
+            >
+              <ViseCard :accent="c.id === activeClassId">
+                <div class="classrow">
+                  <span class="cname">
+                    {{ c.name }}
+                    <ViseBadge v-if="c.negative" variant="auto">negative</ViseBadge>
+                    <ViseBadge v-if="c.id === activeClassId" variant="ver-cur">capturing</ViseBadge>
+                  </span>
+                  <span class="ccount mono-num">{{ project.countsByClass[c.id] ?? 0 }} samples</span>
+                  <span class="del" role="button" :aria-label="`Remove ${c.name}`" @click.stop="removeClass(c.id)">
+                    <ViseIcon name="trash" :size="14" />
+                  </span>
+                </div>
+              </ViseCard>
+            </button>
           </li>
         </ul>
         <p v-else class="empty">No classes yet. Name your first class above.</p>
 
-        <p class="note">
+        <template v-if="project.modality === 'image'">
+          <p class="subhead capture-head">
+            Capture
+            <span v-if="activeClassName" class="into">into {{ activeClassName }}</span>
+          </p>
+          <ViseCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
+            Select a class above, then capture from the webcam or import image files into it.
+          </ViseCard>
+          <div v-else class="capture">
+            <div class="cam">
+              <video ref="video" class="preview" playsinline muted></video>
+              <div class="camrow">
+                <ViseButton v-if="!camera.active.value" size="sm" @click="startCamera">
+                  <ViseIcon name="camera" :size="13" /> Start camera
+                </ViseButton>
+                <template v-else>
+                  <ViseButton size="sm" @click="captureFrame">
+                    <ViseIcon name="plus" :size="13" /> Capture
+                  </ViseButton>
+                  <ViseButton size="sm" variant="ghost" @click="camera.stop()">Stop</ViseButton>
+                  <ViseStatus state="run">live</ViseStatus>
+                </template>
+              </div>
+              <p v-if="camera.error.value" class="camerr">{{ camera.error.value }}</p>
+            </div>
+
+            <div class="import">
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/*"
+                multiple
+                class="hidden-input"
+                data-test="import-file"
+                @change="onFiles"
+              />
+              <ViseButton variant="ghost" size="sm" :disabled="importing" @click="fileInput?.click()">
+                <ViseIcon name="image" :size="13" /> {{ importing ? 'Importing...' : 'Import images' }}
+              </ViseButton>
+              <p class="hint">Each import batch is one capture session.</p>
+            </div>
+          </div>
+        </template>
+        <p v-else class="note">
           Capture and import for {{ info.label }} arrive with the {{ info.label }} flow. The split is
-          by capture session, never a random row, so the same subject does not leak across train and
-          test.
+          by capture session, never a random row.
         </p>
       </div>
 
@@ -139,6 +261,13 @@ function addClass(): void {
   width: 14px;
   height: 2px;
   background: var(--live);
+}
+.capture-head {
+  margin-top: var(--s-6);
+}
+.into {
+  color: var(--live);
+  letter-spacing: 0.08em;
 }
 .modgrid {
   display: grid;
@@ -213,11 +342,20 @@ function addClass(): void {
 }
 .classlist {
   list-style: none;
-  margin: 0;
+  margin: 0 0 var(--s-2);
   padding: 0;
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
+}
+.classbtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
 }
 .classrow {
   display: flex;
@@ -240,8 +378,6 @@ function addClass(): void {
   color: var(--ash);
 }
 .del {
-  background: none;
-  border: none;
   color: var(--ash);
   cursor: pointer;
   padding: 4px;
@@ -256,8 +392,45 @@ function addClass(): void {
   color: var(--ash);
   line-height: 1.6;
 }
-.note {
-  margin-top: var(--s-5);
+.capture {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--s-5);
+  align-items: start;
+}
+@media (max-width: 620px) {
+  .capture {
+    grid-template-columns: 1fr;
+  }
+}
+.preview {
+  width: 192px;
+  height: 192px;
+  background: var(--void);
+  border: 1px solid var(--seam);
+  object-fit: cover;
+  display: block;
+}
+.camrow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-3);
+}
+.camerr {
+  font-size: 11px;
+  color: var(--rust);
+  margin: var(--s-2) 0 0;
+  max-width: 192px;
+}
+.hidden-input {
+  display: none;
+}
+.hint {
+  font-size: 10px;
+  color: var(--ash);
+  margin: var(--s-2) 0 0;
+  max-width: 150px;
 }
 .coach {
   margin: 0;

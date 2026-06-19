@@ -13,6 +13,13 @@ export default defineConfig({
     alias: {
       'tensorflow-web': libraryEntry,
     },
+    // The studio and the aliased library source both import @tensorflow/tfjs.
+    // Without deduping, the bundler would load two copies (one from studio
+    // node_modules, one from the repo root), giving two unrelated tf instances
+    // and two nominal Tensor types. Dedupe only the meta package so both resolve
+    // to the studio copy; its nested tfjs-core, layers, and converter stay
+    // version matched (deduping those mixes versions and breaks internal imports).
+    dedupe: ['@tensorflow/tfjs'],
   },
   // @tensorflow/tfjs-tflite is a WASM build whose module layout the Vite
   // dependency optimizer cannot process. It is loaded from a CDN script tag (see

@@ -7,6 +7,7 @@
  * the live readouts that every modality shares.
  */
 import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import ViseSectionHead from '../design/components/ViseSectionHead.vue';
 import ViseButton from '../design/components/ViseButton.vue';
 import ViseGauge from '../design/components/ViseGauge.vue';
@@ -17,25 +18,37 @@ import ViseIcon from '../design/components/ViseIcon.vue';
 import { useProjectStore } from '../stores/project';
 import { useTrainingStore } from '../stores/training';
 import { useSettingsStore } from '../stores/settings';
+import { usePipeline, MIN_PER_CLASS } from '../composables/usePipeline';
 import { formatFixed, formatPercent } from '../lib/format';
 
 const project = useProjectStore();
 const training = useTrainingStore();
 const settings = useSettingsStore();
+const pipeline = usePipeline();
+const router = useRouter();
 
 const epochs = ref(12);
+const error = ref<string | null>(null);
 
-/** Minimum bar to train: at least two classes with at least a few samples each. */
-const MIN_PER_CLASS = 5;
-const ready = computed(() => {
-  if (project.classes.length < 2) return false;
-  return project.classes.every((c) => (project.countsByClass[c.id] ?? 0) >= MIN_PER_CLASS);
-});
+const ready = computed(() => pipeline.canTrain());
 
 const blockReason = computed(() => {
   if (project.classes.length < 2) return 'Add at least two classes in the Data stage.';
-  return `Collect at least ${MIN_PER_CLASS} samples per class. Capture lands with each modality.`;
+  return `Collect at least ${MIN_PER_CLASS} samples per class in the Data stage.`;
 });
+
+async function startTraining(): Promise<void> {
+  error.value = null;
+  try {
+    await pipeline.train(epochs.value);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  }
+}
+
+function goExport(): void {
+  void router.push('/export');
+}
 
 const lossSeries = computed(() => training.metrics.map((m) => m.loss));
 const accSeries = computed(() =>
@@ -50,11 +63,14 @@ const latestAcc = computed(() => training.latest?.acc);
     <ViseSectionHead index="04" title="Train" note="local and unlimited, runs in this tab" />
 
     <div class="head">
-      <ViseButton :disabled="!ready || training.running">
+      <ViseButton :disabled="!ready || training.running" @click="startTraining">
         <ViseIcon name="play" :size="14" /> Train model
       </ViseButton>
-      <ViseButton v-if="training.running" variant="danger" size="sm">
+      <ViseButton v-if="training.running" variant="danger" size="sm" @click="pipeline.cancel()">
         <ViseIcon name="stop" :size="13" /> Cancel
+      </ViseButton>
+      <ViseButton v-if="training.status === 'done'" variant="ghost" size="sm" @click="goExport">
+        <ViseIcon name="export" :size="13" /> Go to Export
       </ViseButton>
       <ViseStatus :state="training.running ? 'run' : training.status === 'done' ? 'pass' : 'hold'">
         {{ training.running ? `epoch ${training.epoch}/${training.totalEpochs}` : training.status }}
@@ -62,6 +78,7 @@ const latestAcc = computed(() => training.latest?.acc);
     </div>
 
     <p v-if="!ready" class="block">{{ blockReason }}</p>
+    <p v-if="error" class="block err">{{ error }}</p>
 
     <div v-if="settings.editable" class="knob">
       <ViseSlider v-model="epochs" label="Epochs" :min="1" :max="60" :step="1" />
@@ -99,6 +116,9 @@ const latestAcc = computed(() => training.latest?.acc);
   font-size: 12px;
   color: var(--amber);
   margin: 0 0 var(--s-4);
+}
+.block.err {
+  color: var(--rust);
 }
 .knob {
   max-width: 320px;
