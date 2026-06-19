@@ -20,16 +20,31 @@ import { useDeviceBudget } from './useDeviceBudget';
 import { useLiveInference } from './useLiveInference';
 import { defaultFeatureConfig, featureExtractor, featureShape, type FeatureConfig } from '../features';
 import { imageToFeatures, type RgbaFrame } from '../features/image';
+import { audioToFeatures } from '../features/audio';
 import { buildBatchedData } from '../lib/tensors';
 import { sessionAwareSplit } from '../lib/split';
 import { buildModel, summarize } from '../models/builder';
-import { imageCnnPreset } from '../models/presets';
+import { imageCnnPreset, mlpPreset } from '../models/presets';
+import type { ModelSpec } from '../models/types';
+import type { Modality } from '../types';
 import { resolverCallsForLayers } from '../lib/cformat';
 import type { Sample } from '../types';
 import type { ModelSummary } from '../models/types';
 
 /** The minimum samples per class before training is allowed. */
 export const MIN_PER_CLASS = 5;
+
+/** Modalities whose full pipeline is wired today. */
+const SUPPORTED: ReadonlySet<Modality> = new Set<Modality>(['image', 'audio']);
+
+/**
+ * Chooses an architecture for a feature shape: a small CNN for a 2D grid (image
+ * or spectrogram), an MLP for a 1D feature vector (motion summary or text).
+ */
+function presetFor(shape: number[], classCount: number): ModelSpec {
+  if (shape.length === 3) return imageCnnPreset(classCount, Math.min(shape[0]!, shape[1]!));
+  return mlpPreset(classCount);
+}
 
 // Shared singleton state: one trained model and one emitted artifact per session.
 const trainedModel = shallowRef<Model | null>(null);
@@ -70,11 +85,11 @@ export function usePipeline() {
 
   /** Builds a preset model just to report its size for the Model stage. */
   function previewSummary(): ModelSummary | null {
-    if (project.modality !== 'image') return null;
-    const cfg = defaultFeatureConfig('image');
+    if (!SUPPORTED.has(project.modality)) return null;
+    const cfg = defaultFeatureConfig(project.modality);
     const shape = featureShape(cfg);
     const classCount = Math.max(2, project.classes.length);
-    const model = buildModel(imageCnnPreset(classCount, cfg.image.size), shape);
+    const model = buildModel(presetFor(shape, classCount), shape);
     try {
       return summarize(model);
     } finally {
@@ -89,7 +104,7 @@ export function usePipeline() {
    * @throws if the modality is not yet implemented or the data is insufficient.
    */
   async function train(epochs: number, batchSize = 16): Promise<void> {
-    if (project.modality !== 'image') {
+    if (!SUPPORTED.has(project.modality)) {
       throw new Error(`Training for ${project.modality} lands with its phase.`);
     }
     if (!canTrain()) throw new Error('Not enough data to train yet.');
@@ -102,7 +117,7 @@ export function usePipeline() {
     hasModel.value = false;
     live.reset();
 
-    const cfg = defaultFeatureConfig('image');
+    const cfg = defaultFeatureConfig(project.modality);
     const shape = featureShape(cfg);
     const extract = featureExtractor(cfg);
     const ids = project.classes.map((c) => c.id);
@@ -118,7 +133,7 @@ export function usePipeline() {
     const testData = buildBatchedData(testSamples, ids, extract, shape);
 
     const classCount = ids.length;
-    const model = buildModel(imageCnnPreset(classCount, cfg.image.size), shape);
+    const model = buildModel(presetFor(shape, classCount), shape);
 
     trainXs = trainData.xs;
     testXs = testData.xs;
@@ -168,12 +183,26 @@ export function usePipeline() {
     hasModel.value = true;
   }
 
+  /** Maps a raw score array to named, per class results. */
+  function toResults(scores: number[]): { name: string; score: number }[] {
+    return scores.map((score, i) => ({ name: classNames.value[i] ?? `class ${i}`, score }));
+  }
+
   /** Runs one captured frame through the live model, returning per class scores. */
   async function predictImage(frame: RgbaFrame): Promise<{ name: string; score: number }[]> {
-    if (!featureCfg.value) throw new Error('No feature config; train first.');
+    if (featureCfg.value?.kind !== 'image') throw new Error('No image model; train an image project first.');
     const features = imageToFeatures(frame, featureCfg.value.image);
-    const scores = await live.predict(features, fShape.value);
-    return scores.map((score, i) => ({ name: classNames.value[i] ?? `class ${i}`, score }));
+    return toResults(await live.predict(features, fShape.value));
+  }
+
+  /** Runs one captured audio clip through the live model, returning per class scores. */
+  async function predictAudio(
+    samples: Float32Array,
+    sampleRate: number,
+  ): Promise<{ name: string; score: number }[]> {
+    if (featureCfg.value?.kind !== 'audio') throw new Error('No audio model; train an audio project first.');
+    const features = audioToFeatures(samples, sampleRate, featureCfg.value.audio);
+    return toResults(await live.predict(features, fShape.value));
   }
 
   /** The op resolver calls and input shape a sketch export needs. */
@@ -196,6 +225,7 @@ export function usePipeline() {
     cancel: trainer.cancel,
     exportModel,
     predictImage,
+    predictAudio,
     exportOps,
   };
 }

@@ -18,7 +18,9 @@ import { useProjectStore } from '../stores/project';
 import { useSettingsStore } from '../stores/settings';
 import { useDataset } from '../composables/useDataset';
 import { useCamera, CAPTURE_SIZE } from '../composables/useCamera';
+import { useMicrophone } from '../composables/useMicrophone';
 import { fileToFrame } from '../lib/imageDecode';
+import { fileToAudio } from '../lib/audioDecode';
 import { MODALITIES, MODALITY_ORDER } from '../lib/modalities';
 import type { Modality } from '../types';
 
@@ -26,14 +28,18 @@ const project = useProjectStore();
 const settings = useSettingsStore();
 const dataset = useDataset();
 const camera = useCamera();
+const mic = useMicrophone();
 
 const newClassName = ref('');
 const activeClassId = ref<string | null>(null);
 const importing = ref(false);
+const recording = ref(false);
 const cameraSession = ref<string | null>(null);
+const micSession = ref<string | null>(null);
 const info = computed(() => MODALITIES[project.modality]);
 const video = useTemplateRef<HTMLVideoElement>('video');
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput');
+const audioInput = useTemplateRef<HTMLInputElement>('audioInput');
 
 onMounted(async () => {
   await dataset.init();
@@ -90,6 +96,39 @@ async function onFiles(event: Event): Promise<void> {
     for (const file of files) {
       const frame = await fileToFrame(file, CAPTURE_SIZE);
       await dataset.addImageSample(activeClassId.value, session, frame);
+    }
+  } finally {
+    importing.value = false;
+    input.value = '';
+  }
+}
+
+async function startMic(): Promise<void> {
+  await mic.start();
+  micSession.value = newSessionId();
+}
+
+async function recordClip(): Promise<void> {
+  if (!activeClassId.value || !micSession.value || recording.value) return;
+  recording.value = true;
+  try {
+    const clip = await mic.record();
+    await dataset.addAudioSample(activeClassId.value, micSession.value, clip);
+  } finally {
+    recording.value = false;
+  }
+}
+
+async function onAudioFiles(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const files = input.files ? Array.from(input.files) : [];
+  if (!files.length || !activeClassId.value) return;
+  importing.value = true;
+  const session = newSessionId();
+  try {
+    for (const file of files) {
+      const clip = await fileToAudio(file);
+      await dataset.addAudioSample(activeClassId.value, session, clip);
     }
   } finally {
     importing.value = false;
@@ -222,6 +261,49 @@ const activeClassName = computed(
             </div>
           </div>
         </template>
+        <template v-else-if="project.modality === 'audio'">
+          <p class="subhead capture-head">
+            Capture
+            <span v-if="activeClassName" class="into">into {{ activeClassName }}</span>
+          </p>
+          <ViseCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
+            Select a class above, then record one second clips from the microphone or import audio
+            files into it. Add a Background Noise class so the model has a rest state.
+          </ViseCard>
+          <div v-else class="capture">
+            <div class="cam">
+              <div class="camrow">
+                <ViseButton v-if="!mic.active.value" size="sm" @click="startMic">
+                  <ViseIcon name="mic" :size="13" /> Start microphone
+                </ViseButton>
+                <template v-else>
+                  <ViseButton size="sm" :disabled="recording" @click="recordClip">
+                    <ViseIcon name="mic" :size="13" /> {{ recording ? 'Recording...' : 'Record 1s' }}
+                  </ViseButton>
+                  <ViseButton size="sm" variant="ghost" @click="mic.stop()">Stop</ViseButton>
+                  <ViseStatus :state="recording ? 'run' : 'pass'">{{ recording ? 'recording' : 'ready' }}</ViseStatus>
+                </template>
+              </div>
+              <p v-if="mic.error.value" class="camerr">{{ mic.error.value }}</p>
+            </div>
+            <div class="import">
+              <input
+                ref="audioInput"
+                type="file"
+                accept="audio/*"
+                multiple
+                class="hidden-input"
+                data-test="import-audio"
+                @change="onAudioFiles"
+              />
+              <ViseButton variant="ghost" size="sm" :disabled="importing" @click="audioInput?.click()">
+                <ViseIcon name="mic" :size="13" /> {{ importing ? 'Importing...' : 'Import clips' }}
+              </ViseButton>
+              <p class="hint">Each import batch is one capture session.</p>
+            </div>
+          </div>
+        </template>
+
         <p v-else class="note">
           Capture and import for {{ info.label }} arrive with the {{ info.label }} flow. The split is
           by capture session, never a random row.

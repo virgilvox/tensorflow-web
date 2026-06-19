@@ -75,6 +75,21 @@ export function useDataset() {
     return sample;
   }
 
+  /** Adds an audio sample, persists it, and returns the stored record. */
+  async function addAudioSample(
+    classId: string,
+    sessionId: string,
+    clip: { data: Float32Array; sampleRate: number },
+  ): Promise<Sample> {
+    const sample = project.addSample({
+      classId,
+      sessionId,
+      payload: { kind: 'audio', sampleRate: clip.sampleRate, data: clip.data },
+    });
+    await persistSample(sample);
+    return sample;
+  }
+
   /** Persists one sample record. */
   async function persistSample(sample: Sample): Promise<void> {
     if (!storageAvailable()) return;
@@ -125,5 +140,5 @@ export function useDataset() {
     }
   }
 
-  return { init, persistMeta, addImageSample, removeSample, removeClass, clearAll };
+  return { init, persistMeta, addImageSample, addAudioSample, removeSample, removeClass, clearAll };
 }

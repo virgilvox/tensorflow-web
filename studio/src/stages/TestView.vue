@@ -17,18 +17,23 @@ import { useProjectStore } from '../stores/project';
 import { useTrainingStore } from '../stores/training';
 import { usePipeline } from '../composables/usePipeline';
 import { useCamera, CAPTURE_SIZE } from '../composables/useCamera';
+import { useMicrophone } from '../composables/useMicrophone';
 import { fileToFrame } from '../lib/imageDecode';
+import { fileToAudio } from '../lib/audioDecode';
 import { formatPercent } from '../lib/format';
 
 const project = useProjectStore();
 const training = useTrainingStore();
 const pipeline = usePipeline();
 const camera = useCamera();
+const mic = useMicrophone();
 
 const video = useTemplateRef<HTMLVideoElement>('video');
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput');
+const audioInput = useTemplateRef<HTMLInputElement>('audioInput');
 const predictions = ref<{ name: string; score: number }[]>([]);
 const error = ref<string | null>(null);
+const recording = ref(false);
 
 const classNames = computed(() => project.classes.map((c) => c.name));
 const report = computed(() => training.report);
@@ -69,6 +74,38 @@ async function predictFromFile(event: Event): Promise<void> {
     input.value = '';
   }
 }
+
+async function startMic(): Promise<void> {
+  await mic.start();
+}
+
+async function recordAndPredict(): Promise<void> {
+  error.value = null;
+  recording.value = true;
+  try {
+    const clip = await mic.record();
+    predictions.value = await pipeline.predictAudio(clip.data, clip.sampleRate);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    recording.value = false;
+  }
+}
+
+async function predictAudioFromFile(event: Event): Promise<void> {
+  error.value = null;
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    const clip = await fileToAudio(file);
+    predictions.value = await pipeline.predictAudio(clip.data, clip.sampleRate);
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err);
+  } finally {
+    input.value = '';
+  }
+}
 </script>
 
 <template>
@@ -85,7 +122,7 @@ async function predictFromFile(event: Event): Promise<void> {
       </div>
 
       <div v-else class="livegrid">
-        <div class="cam">
+        <div v-if="project.modality === 'image'" class="cam">
           <video ref="video" class="preview" playsinline muted></video>
           <div class="camrow">
             <ViseButton v-if="!camera.active.value" size="sm" @click="startCamera">
@@ -104,6 +141,29 @@ async function predictFromFile(event: Event): Promise<void> {
             />
             <ViseButton variant="ghost" size="sm" @click="fileInput?.click()">
               <ViseIcon name="image" :size="13" /> Predict an image
+            </ViseButton>
+          </div>
+          <p v-if="error" class="err">{{ error }}</p>
+        </div>
+
+        <div v-else class="cam">
+          <div class="camrow">
+            <ViseButton v-if="!mic.active.value" size="sm" @click="startMic">
+              <ViseIcon name="mic" :size="13" /> Start microphone
+            </ViseButton>
+            <ViseButton v-else size="sm" :disabled="recording" @click="recordAndPredict">
+              <ViseIcon name="mic" :size="13" /> {{ recording ? 'Listening...' : 'Record and predict' }}
+            </ViseButton>
+            <input
+              ref="audioInput"
+              type="file"
+              accept="audio/*"
+              class="hidden-input"
+              data-test="predict-audio-file"
+              @change="predictAudioFromFile"
+            />
+            <ViseButton variant="ghost" size="sm" @click="audioInput?.click()">
+              <ViseIcon name="mic" :size="13" /> Predict a clip
             </ViseButton>
           </div>
           <p v-if="error" class="err">{{ error }}</p>
