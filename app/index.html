@@ -78,11 +78,14 @@
     <!--
       The TensorFlow Lite WASM interpreter is loaded from a CDN as a script tag,
       which is its supported browser usage and which the Vite optimizer cannot
-      bundle. It exposes a global "tflite" that the library's verify() detects
-      and uses. Training, calibration, quantization, and export work without it;
-      only the verify step needs it.
+      bundle. It exposes a global "tflite" that the library's verify() detects.
+      The interpreter wraps its outputs with a global tf, so tfjs is loaded first.
+      alpha.8 is used because the alpha.10 npm build omits the WASM binaries.
+      Training, calibration, quantization, and export work without any of this;
+      only the verify step needs the interpreter.
     -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.10/dist/tf-tflite.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.9.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/tf-tflite.min.js"></script>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

@@ -16,6 +16,13 @@ import {
   type VerifyReport,
 } from 'tensorflow-web';
 
+// The TFLite WASM interpreter is loaded as a global by the CDN script in
+// index.html. Point it at a dist that actually ships the WASM binaries (the
+// alpha.10 npm build omits them) so verify can load the emitted model.
+const tfliteGlobal = (window as unknown as { tflite?: { setWasmPath?: (p: string) => void } })
+  .tflite;
+tfliteGlobal?.setWasmPath?.('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/');
+
 // The three shapes the model learns to tell apart. Index is the class label.
 const CLASS_NAMES = ['square', 'disc', 'ring'] as const;
 

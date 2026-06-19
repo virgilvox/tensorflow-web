@@ -1,6 +1,6 @@
 {
   "name": "tensorflow-web",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Train a TensorFlow model in the browser tab and emit a verified .tflite. Headless, framework free, int8 quantization included.",
   "type": "module",
   "license": "Apache-2.0",

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tensorflow-web from a CDN</title>
+
+    <!--
+      tensorflow-web is published to npm and mirrored to the public CDNs, so it
+      runs in a plain browser with no build step. The import map points the two
+      bare module specifiers at CDN URLs:
+        - tensorflow-web   the published package (jsDelivr mirror of npm)
+        - @tensorflow/tfjs the peer dependency the library imports internally
+      Change the version after the @ to track a different release.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "tensorflow-web": "https://cdn.jsdelivr.net/npm/tensorflow-web@0.1.2/dist/index.js",
+          "@tensorflow/tfjs": "https://esm.sh/@tensorflow/tfjs@4.9.0"
+        }
+      }
+    </script>
+
+    <!--
+      Optional, for the verify step only. The TensorFlow Lite WASM interpreter is
+      loaded as a global script (its supported browser usage), and tfjs is loaded
+      as a global first because the interpreter wraps its outputs with it. Without
+      these two scripts everything except verify still works.
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.9.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/tf-tflite.min.js"></script>
+
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        margin: 0;
+        padding: 3rem 1.5rem;
+        font: 15px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: #1a1a1a;
+        background: #fafafa;
+        max-width: 46rem;
+        margin-inline: auto;
+      }
+      h1 {
+        font-size: 1.4rem;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        margin: 0 0 0.25rem;
+      }
+      p.lede {
+        color: #555;
+        margin: 0 0 2rem;
+      }
+      button {
+        font: inherit;
+        padding: 0.6rem 1.1rem;
+        border: 1px solid #1a1a1a;
+        background: #1a1a1a;
+        color: #fafafa;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      button.secondary {
+        background: transparent;
+        color: #1a1a1a;
+      }
+      .controls {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+      }
+      pre {
+        background: #fff;
+        border: 1px solid #e2e2e2;
+        padding: 1rem;
+        white-space: pre-wrap;
+        min-height: 8rem;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>tensorflow-web from a CDN</h1>
+    <p class="lede">
+      Train a small model in the tab, quantize it to int8, emit a real .tflite,
+      verify it against the float reference in the actual TFLite interpreter, and
+      download the file. No build step. View source to read the whole flow.
+    </p>
+
+    <div class="controls">
+      <button id="run" type="button">Train and export</button>
+      <button id="download" type="button" class="secondary" disabled>Download .tflite</button>
+    </div>
+    <pre id="log">Ready. Press "Train and export".</pre>
+
+    <script type="module">
+      import * as tf from '@tensorflow/tfjs';
+      import { train, calibrate, quantize, toTFLite, verify } from 'tensorflow-web';
+
+      const logEl = document.getElementById('log');
+      const runBtn = document.getElementById('run');
+      const downloadBtn = document.getElementById('download');
+      const log = (line) => {
+        logEl.textContent += `\n${line}`;
+      };
+
+      // The interpreter loads its WASM from this prefix (the alpha.10 npm build
+      // omits the binaries, so the alpha.8 CDN is used). Only verify needs it.
+      globalThis.tflite?.setWasmPath?.(
+        'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.8/dist/',
+      );
+
+      // A small reproducible task: classify which horizontal band of an 8x8
+      // image holds the bright stripe. Self contained, no data to download.
+      function makeData(n, seed) {
+        let s = seed >>> 0;
+        const rand = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0), s / 2 ** 32);
+        const xs = new Float32Array(n * 64);
+        const ys = new Float32Array(n * 3);
+        const labels = [];
+        for (let i = 0; i < n; i++) {
+          const c = Math.floor(rand() * 3);
+          labels.push(c);
+          ys[i * 3 + c] = 1;
+          for (let r = 0; r < 8; r++) {
+            const band = r < 3 ? 0 : r < 6 ? 1 : 2;
+            for (let col = 0; col < 8; col++) {
+              xs[i * 64 + r * 8 + col] = rand() * 0.3 + (band === c ? 1 : 0);
+            }
+          }
+        }
+        return { xs: tf.tensor4d(xs, [n, 8, 8, 1]), ys: tf.tensor2d(ys, [n, 3]), labels };
+      }
+
+      let lastBytes = null;
+
+      async function runPipeline() {
+        runBtn.disabled = true;
+        downloadBtn.disabled = true;
+        logEl.textContent = `tensorflow-web ready (tfjs ${tf.version_core}).`;
+
+        await tf.setBackend('cpu');
+        await tf.ready();
+
+        const model = tf.sequential();
+        model.add(
+          tf.layers.conv2d({ inputShape: [8, 8, 1], filters: 8, kernelSize: 3, activation: 'relu' }),
+        );
+        model.add(tf.layers.maxPooling2d({ poolSize: 2 }));
+        model.add(tf.layers.flatten());
+        model.add(tf.layers.dense({ units: 3, activation: 'softmax' }));
+        model.compile({ optimizer: tf.train.adam(0.01), loss: 'categoricalCrossentropy' });
+
+        const trainData = makeData(256, 1);
+        const testData = makeData(64, 999);
+
+        log('training...');
+        await train(model, {
+          data: trainData,
+          epochs: 20,
+          batchSize: 32,
+          onEpoch: (epoch, logs) => log(`  epoch ${epoch + 1}  loss ${logs.loss.toFixed(4)}`),
+        });
+
+        log('calibrating and quantizing to int8...');
+        const calibration = await calibrate(model, trainData.xs);
+        const quantized = quantize(model, calibration);
+
+        log('emitting .tflite...');
+        lastBytes = await toTFLite(quantized);
+        log(`emitted ${lastBytes.length} bytes`);
+        downloadBtn.disabled = false;
+
+        // verify is optional and needs the interpreter scripts above.
+        if (globalThis.tflite) {
+          log('verifying in the real TFLite interpreter...');
+          const report = await verify(lastBytes, model, testData, { tolerance: 0.1 });
+          log(`parity: ${report.parity ? 'pass' : 'fail'}  maxAbsError ${report.maxAbsError.toExponential(2)}`);
+          log(`float accuracy ${report.floatAcc}  int8 accuracy ${report.int8Acc}`);
+        } else {
+          log('verify skipped (interpreter scripts not loaded)');
+        }
+
+        log('done.');
+        runBtn.disabled = false;
+      }
+
+      function download() {
+        if (!lastBytes) return;
+        const url = URL.createObjectURL(new Blob([lastBytes], { type: 'application/octet-stream' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'model.tflite';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      runBtn.addEventListener('click', () => {
+        runPipeline().catch((e) => {
+          log(`error: ${e?.message ?? e}`);
+          runBtn.disabled = false;
+        });
+      });
+      downloadBtn.addEventListener('click', download);
+    </script>
+  </body>
+</html>
