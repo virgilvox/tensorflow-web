@@ -43,10 +43,17 @@ function serializePayload(payload: SamplePayload): SerializedPayload {
   }
 }
 
-/** Rebuilds a payload's typed arrays from the JSON shape. */
+/** The error thrown for any file that is not a valid project file. */
+function invalid(): never {
+  throw new Error('Not a recognized VISE Studio project file.');
+}
+
+/** Rebuilds a payload's typed arrays from the JSON shape, validating its shape. */
 function deserializePayload(payload: SerializedPayload): SamplePayload {
+  if (!payload || typeof payload !== 'object') invalid();
   switch (payload.kind) {
     case 'image':
+      if (!Array.isArray(payload.data)) invalid();
       return {
         kind: 'image',
         width: payload.width,
@@ -54,11 +61,19 @@ function deserializePayload(payload: SerializedPayload): SamplePayload {
         data: new Uint8ClampedArray(payload.data),
       };
     case 'audio':
+      if (!Array.isArray(payload.data)) invalid();
       return { kind: 'audio', sampleRate: payload.sampleRate, data: Float32Array.from(payload.data) };
     case 'motion':
+      if (!Array.isArray(payload.data)) invalid();
       return { kind: 'motion', hz: payload.hz, axes: payload.axes, data: Float32Array.from(payload.data) };
     case 'text':
+      if (typeof payload.text !== 'string') invalid();
       return { kind: 'text', text: payload.text };
+    default:
+      // An unknown payload kind means a corrupt or foreign file. Fail loudly
+      // here rather than load a sample with an undefined payload that crashes
+      // deep in feature extraction later.
+      return invalid();
   }
 }
 
@@ -98,15 +113,26 @@ export function parseProject(input: unknown): {
 } {
   const file = input as Partial<ProjectFile>;
   if (!file || file.version !== 1 || !Array.isArray(file.classes) || !Array.isArray(file.samples)) {
-    throw new Error('Not a recognized VISE Studio project file.');
+    invalid();
   }
-  const samples: Sample[] = file.samples.map((s) => ({
-    id: s.id,
-    classId: s.classId,
-    sessionId: s.sessionId,
-    createdAt: s.createdAt,
-    payload: deserializePayload(s.payload),
-  }));
+  const samples: Sample[] = file.samples.map((s) => {
+    if (
+      !s ||
+      typeof s.id !== 'string' ||
+      typeof s.classId !== 'string' ||
+      typeof s.sessionId !== 'string' ||
+      typeof s.createdAt !== 'number'
+    ) {
+      invalid();
+    }
+    return {
+      id: s.id,
+      classId: s.classId,
+      sessionId: s.sessionId,
+      createdAt: s.createdAt,
+      payload: deserializePayload(s.payload),
+    };
+  });
   return {
     name: file.name ?? 'untitled',
     modality: (file.modality ?? 'image') as Modality,

@@ -63,10 +63,13 @@ and the WASM interpreter from a CDN, which carry nothing of yours.
 ## Verification and device fit
 
 The emitted `.tflite` is loaded back into the real TFLite interpreter and checked
-against the float reference before it is shown as shippable. The float versus int8
-accuracy delta is displayed, never hidden, and a device budget meter reports the
-exact flash size and an estimated runtime arena against a selected target (ESP32,
-ESP32 S3, or a generic Cortex M), green when it fits and red when it does not.
+against the float reference before it is shown as shippable. Parity is enforced,
+not just displayed: if the int8 model does not match the float reference within
+tolerance, the artifact is not offered for download and is not loaded for live
+inference, and the failure is shown plainly. The float versus int8 accuracy delta
+is displayed, never hidden, and a device budget meter reports the exact flash size
+and an estimated runtime arena against a selected target (ESP32, ESP32 S3, or a
+generic Cortex M), green when it fits and red when it does not.
 
 ## Architecture
 

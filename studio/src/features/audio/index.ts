@@ -101,6 +101,11 @@ export function audioToFeatures(
   const range = max - min;
   if (range > 1e-9) {
     for (let i = 0; i < populated; i++) out[i] = (out[i]! - min) / range;
+  } else {
+    // A silent or constant energy clip has no range to normalize. Zero it so the
+    // input boundary stays in 0..1 rather than keeping raw log domain values,
+    // matching the motion extractor's degenerate case handling.
+    for (let i = 0; i < populated; i++) out[i] = 0;
   }
   return out;
 }

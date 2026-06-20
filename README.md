@@ -165,6 +165,10 @@ npm run app         # run the test app at http://localhost:5173
 
 Adding support for a new layer is a small, isolated change: write a converter under `src/ops/`, register it, and add a parity case. See [`DESIGN.md`](./DESIGN.md) for the architecture and the weight layout rules.
 
+## VISE Studio
+
+[`studio/`](./studio/README.md) holds VISE Studio, a browser native, local first application built on this library: collect data, train a small model, test it live, and export a verified int8 `.tflite` for image, audio, motion, and text. It is a separate package with its own dependencies, imports the library source through a Vite alias, and is never published with the library. See its [README](./studio/README.md) to run it.
+
 ## License
 
 Apache License 2.0. See [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).

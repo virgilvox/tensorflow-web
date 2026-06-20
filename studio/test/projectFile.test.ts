@@ -53,4 +53,23 @@ describe('project file round trip', () => {
     expect(() => parseProject({ version: 2, classes: [], samples: [] })).toThrow();
     expect(() => parseProject(null)).toThrow();
   });
+
+  it('rejects a corrupt sample payload instead of loading an undefined payload', () => {
+    const base = { version: 1, name: 'x', modality: 'image', classes: [] };
+    // Unknown payload kind.
+    expect(() =>
+      parseProject({
+        ...base,
+        samples: [{ id: 'a', classId: 'c', sessionId: 's', createdAt: 0, payload: { kind: 'video', data: [] } }],
+      }),
+    ).toThrow();
+    // Missing payload.
+    expect(() =>
+      parseProject({ ...base, samples: [{ id: 'a', classId: 'c', sessionId: 's', createdAt: 0 }] }),
+    ).toThrow();
+    // Malformed sample fields.
+    expect(() =>
+      parseProject({ ...base, samples: [{ id: 5, payload: { kind: 'text', text: 'hi' } }] }),
+    ).toThrow();
+  });
 });

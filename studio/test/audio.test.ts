@@ -34,6 +34,13 @@ describe('audioToFeatures', () => {
     expect(f.length).toBe(32 * 32);
   });
 
+  it('maps a silent clip to all zeros, not raw log domain values', () => {
+    const silence = new Float32Array(16000);
+    const f = audioToFeatures(silence, 16000, DEFAULT_AUDIO_CONFIG);
+    expect(f.length).toBe(32 * 32);
+    expect(Array.from(f).every((v) => v === 0)).toBe(true);
+  });
+
   it('reports the single channel tensor shape', () => {
     expect(audioTensorShape(DEFAULT_AUDIO_CONFIG)).toEqual([32, 32, 1]);
     expect(audioTensorShape({ ...DEFAULT_AUDIO_CONFIG, mode: 'mfcc', numCoeffs: 13 })).toEqual([

@@ -25,6 +25,9 @@ export function useCamera() {
    */
   async function start(el: HTMLVideoElement): Promise<void> {
     error.value = null;
+    // Release any stream already held so a re-entrant start does not leak the
+    // previous MediaStream and leave the camera on.
+    stop();
     video = el;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });

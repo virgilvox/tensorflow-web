@@ -50,6 +50,9 @@ const LUMA_B = 0.114;
 export function resizeRgba(frame: RgbaFrame, dw: number, dh: number): Uint8ClampedArray {
   const { width: sw, height: sh, data } = frame;
   const out = new Uint8ClampedArray(dw * dh * 4);
+  // A zero dimension source has no pixels to sample; return the zero buffer
+  // rather than reading out of bounds and producing NaN.
+  if (sw === 0 || sh === 0) return out;
   // Map destination pixel centers back into source space.
   const xRatio = sw / dw;
   const yRatio = sh / dh;

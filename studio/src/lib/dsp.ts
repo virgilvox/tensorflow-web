@@ -112,7 +112,7 @@ export function logMelSpectrogram(signal: Float32Array, opts: SpectrogramOptions
   const filters = melFilterbank(opts);
 
   const frames = signal.length >= fftSize ? 1 + Math.floor((signal.length - fftSize) / hopSize) : 0;
-  const data = new Float32Array(Math.max(0, frames) * numMel);
+  const data = new Float32Array(frames * numMel);
   const frame = new Float32Array(fftSize);
 
   for (let t = 0; t < frames; t++) {

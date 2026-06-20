@@ -35,6 +35,14 @@ describe('toCArray', () => {
       .filter((l) => l.trim().startsWith('0x'));
     expect(rows.length).toBe(2);
   });
+
+  it('carries an include guard so it can be included more than once', () => {
+    expect(toCArray(new Uint8Array([1]), 'm')).toContain('#pragma once');
+  });
+
+  it('throws on empty input rather than emitting uncompilable C', () => {
+    expect(() => toCArray(new Uint8Array([]), 'm')).toThrow();
+  });
 });
 
 describe('resolverCallsForLayers', () => {

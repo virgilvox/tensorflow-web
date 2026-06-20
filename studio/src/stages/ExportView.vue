@@ -128,6 +128,10 @@ function dlSketch(): void {
     </div>
 
     <p class="subhead">Downloads</p>
+    <p v-if="report && !report.parity" class="err">
+      Parity failed: the int8 model does not match the float reference within tolerance, so it is
+      not offered for download. Try more calibration data or retrain.
+    </p>
     <div class="downloads">
       <ViseButton :disabled="!hasBytes" @click="dlTflite"><ViseIcon name="download" :size="14" /> .tflite</ViseButton>
       <ViseButton variant="ghost" :disabled="!hasBytes" @click="dlCArray">

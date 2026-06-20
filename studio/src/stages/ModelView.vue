@@ -37,7 +37,8 @@ watchEffect(() => {
   void project.samples.length;
   try {
     summary.value = pipeline.previewSummary();
-    opLayers.value = pipeline.inspectLayers();
+    // The operator inspector is Expert only, so only build its model there.
+    opLayers.value = settings.expert ? pipeline.inspectLayers() : [];
   } catch {
     summary.value = null;
     opLayers.value = [];

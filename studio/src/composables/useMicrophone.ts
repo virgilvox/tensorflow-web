@@ -21,6 +21,9 @@ export function useMicrophone() {
   let ctx: AudioContext | null = null;
   let source: MediaStreamAudioSourceNode | null = null;
   let processor: ScriptProcessorNode | null = null;
+  // Settles an in-flight record() if the graph is torn down mid capture, so the
+  // promise never hangs.
+  let abortRecord: (() => void) | null = null;
 
   /**
    * Opens the microphone stream and the audio graph.
@@ -47,6 +50,9 @@ export function useMicrophone() {
 
   /** Stops the stream and tears down the audio graph. */
   function stop(): void {
+    // Settle a pending record so its awaiter does not hang after teardown.
+    abortRecord?.();
+    abortRecord = null;
     processor?.disconnect();
     source?.disconnect();
     stream?.getTracks().forEach((t) => t.stop());
@@ -70,13 +76,19 @@ export function useMicrophone() {
     const need = Math.round(sampleRate * seconds);
     const chunks: Float32Array[] = [];
     let got = 0;
-    return new Promise<AudioClip>((resolve) => {
+    return new Promise<AudioClip>((resolve, reject) => {
+      abortRecord = () => {
+        if (processor) processor.onaudioprocess = null;
+        abortRecord = null;
+        reject(new Error('Recording stopped before it finished.'));
+      };
       processor!.onaudioprocess = (e) => {
         const ch = e.inputBuffer.getChannelData(0);
         chunks.push(new Float32Array(ch));
         got += ch.length;
         if (got >= need) {
           processor!.onaudioprocess = null;
+          abortRecord = null;
           const data = new Float32Array(need);
           let offset = 0;
           for (const chunk of chunks) {

@@ -74,6 +74,19 @@ function disposeTensors(): void {
   trainXs = testXs = testYs = null;
 }
 
+/**
+ * Disposes a model and its optimizer. tfjs frees the optimizer on dispose() only
+ * when it was compiled from a string; the builder compiles with an Adam instance,
+ * which leaves the per weight slot variables (m, v) for us to free, so they are
+ * released explicitly here. Safe to call with null.
+ */
+function disposeModel(model: Model | null): void {
+  if (!model) return;
+  const optimizer = (model as Model & { optimizer?: { dispose?: () => void } }).optimizer;
+  model.dispose();
+  optimizer?.dispose?.();
+}
+
 export function usePipeline() {
   const project = useProjectStore();
   const training = useTrainingStore();
@@ -133,9 +146,9 @@ export function usePipeline() {
     }
     if (!canTrain()) throw new Error('Not enough data to train yet.');
 
-    // Reset any prior run.
+    // Reset any prior run, freeing the previous model, its optimizer, and tensors.
     disposeTensors();
-    trainedModel.value?.dispose();
+    disposeModel(trainedModel.value);
     trainedModel.value = null;
     bytes.value = null;
     hasModel.value = false;
@@ -156,59 +169,88 @@ export function usePipeline() {
     const shape = featureShape(cfg);
     if (shape.some((d) => d <= 0)) throw new Error('No usable features; add more varied data.');
     const extract = featureExtractor(cfg);
-
-    const trainData = buildBatchedData(trainSamples, ids, extract, shape);
-    const testData = buildBatchedData(testSamples, ids, extract, shape);
-
     const classCount = ids.length;
-    const model = buildModel(presetFor(shape, classCount), shape);
 
-    trainXs = trainData.xs;
-    testXs = testData.xs;
-    testYs = testData.ys;
-    classOrder.value = ids;
-    classNames.value = project.classes.map((c) => c.name);
-    featureCfg.value = cfg;
-    fShape.value = shape;
-
+    // Allocate the tensors and the model inside a guarded block so a failure at
+    // any step frees everything it created instead of orphaning tensors. The
+    // module refs are assigned as soon as each tensor exists, so disposeTensors
+    // can reach them on the error path.
+    let model: Model | null = null;
+    let trainYs: tf.Tensor | null = null;
     try {
+      const trainData = buildBatchedData(trainSamples, ids, extract, shape);
+      trainXs = trainData.xs;
+      trainYs = trainData.ys;
+      const testData = buildBatchedData(testSamples, ids, extract, shape);
+      testXs = testData.xs;
+      testYs = testData.ys;
+
+      model = buildModel(presetFor(shape, classCount), shape);
+
+      classOrder.value = ids;
+      classNames.value = project.classes.map((c) => c.name);
+      featureCfg.value = cfg;
+      fShape.value = shape;
+
       await trainer.run({
         model,
-        data: { xs: trainXs, ys: trainData.ys },
+        data: { xs: trainXs, ys: trainYs },
         validationData: { xs: testXs, ys: testYs },
         epochs,
         batchSize,
       });
-    } finally {
-      // The training labels are not needed past the fit; the inputs stay for
-      // calibration at export time.
-      trainData.ys.dispose();
-    }
 
-    trainedModel.value = model;
+      trainedModel.value = model;
+      model = null; // ownership transferred to the store; do not dispose below
+    } catch (err) {
+      disposeTensors();
+      disposeModel(model);
+      throw err;
+    } finally {
+      // The training labels are not needed past the fit (or after a failure);
+      // the inputs stay for calibration at export time.
+      trainYs?.dispose();
+    }
   }
 
   /**
-   * Calibrates, quantizes, emits, verifies, and budgets the trained model, then
-   * loads the result for live inference.
+   * Calibrates, quantizes, emits, verifies, and budgets the trained model. The
+   * emitted bytes become shippable (downloadable and loaded for live inference)
+   * only when verify reports parity: a .tflite that does not match the float
+   * reference is worthless, so it is never exposed. The verify report is always
+   * stored so the failure is shown, not hidden.
    *
-   * @returns nothing; results land in the training store and this pipeline.
-   * @throws if no model is trained, or the interpreter is unavailable.
+   * @throws if no model is trained, or the interpreter is unavailable. On any
+   *   failure the pipeline is left with no shippable artifact.
    */
   async function exportModel(): Promise<void> {
     const model = trainedModel.value;
     if (!model || !trainXs || !testXs || !testYs) {
       throw new Error('Train a model before exporting.');
     }
-    const emitted = await quantizer.toInt8Tflite(model, trainXs);
-    bytes.value = emitted;
+    try {
+      const emitted = await quantizer.toInt8Tflite(model, trainXs);
+      const report = await verifier.run(emitted, model, { xs: testXs, ys: testYs }, 0.05);
+      const result = budget.evaluate(emitted, model, settings.target, report.arenaBytes);
+      // Show the result either way, including a parity failure.
+      training.setArtifacts(emitted.length, report, result);
 
-    const report = await verifier.run(emitted, model, { xs: testXs, ys: testYs }, 0.05);
-    const result = budget.evaluate(emitted, model, settings.target, report.arenaBytes);
-    training.setArtifacts(emitted.length, report, result);
-
-    await live.load(emitted);
-    hasModel.value = true;
+      if (report.parity) {
+        bytes.value = emitted;
+        await live.load(emitted);
+        hasModel.value = true;
+      } else {
+        // Parity failed: do not expose the artifact for download or live use.
+        bytes.value = null;
+        hasModel.value = false;
+        live.reset();
+      }
+    } catch (err) {
+      bytes.value = null;
+      hasModel.value = false;
+      live.reset();
+      throw err;
+    }
   }
 
   /** Maps a raw score array to named, per class results. */
@@ -252,9 +294,15 @@ export function usePipeline() {
 
   /** The op resolver calls and input shape a sketch export needs. */
   function exportOps(): { resolverCalls: string[]; inputShape: number[] } {
-    const model = trainedModel.value;
-    const classes = model?.layers.map((l) => l.getClassName()) ?? [];
-    const resolverCalls = resolverCallsForLayers(classes, true);
+    const layers = trainedModel.value?.layers ?? [];
+    const classes = layers.map((l) => l.getClassName());
+    // Derive the softmax head from the real model's last layer activation rather
+    // than assuming it, so the resolver list reflects the actual graph.
+    const last = layers[layers.length - 1];
+    const activation = last
+      ? (last.getConfig() as { activation?: string }).activation
+      : undefined;
+    const resolverCalls = resolverCallsForLayers(classes, activation === 'softmax');
     const inputShape = [1, ...fShape.value];
     return { resolverCalls, inputShape };
   }

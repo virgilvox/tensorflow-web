@@ -40,7 +40,14 @@ const error = ref<string | null>(null);
 const recording = ref(false);
 const textValue = ref('');
 
-const classNames = computed(() => project.classes.map((c) => c.name));
+// The confusion matrix is indexed by the class order frozen at train time, so it
+// must be labelled with the frozen names from the pipeline, not the live store
+// order (which the user can change after exporting).
+const classNames = computed(() =>
+  pipeline.classNames.value.length
+    ? pipeline.classNames.value
+    : project.classes.map((c) => c.name),
+);
 const report = computed(() => training.report);
 const live = computed(() => pipeline.hasModel.value);
 const top = computed(() =>
