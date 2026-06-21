@@ -62,6 +62,22 @@ Added after the original five phases (audit driven and on request):
   and reverted because it was a no-op there and would relocate the collapse to the
   top band at extreme configs. An invariant test asserts the default config stays
   collapse-free.
+- Real Standard-altitude controls: the Features stage edits the per-modality knobs
+  (image size and channels, audio clip length / mel-or-mfcc / mel bands, motion
+  steps, text vocabulary cap) and the Model stage edits a size lever (compact /
+  standard / large), all threaded through `buildFeatureConfig`/`presetFor` from the
+  settings store. Defaults equal the auto pipeline, so Guided is unchanged. The
+  Features stage shows a live input-shape preview; the smoke proves the controls
+  are real (changing image size moves the shape).
+- Per-class precision, recall, and F1 on the Test stage, computed from the verify
+  confusion matrix (`lib/metrics.ts`), for every modality.
+- Capture hardening: camera and microphone surface a clear secure-context message
+  on an insecure origin instead of a raw TypeError. Interpreter models are now
+  disposed before being replaced in live inference and the Playground.
+- Audit fix: live capture and the exported bundle take the audio clip length from
+  the model's FROZEN `featureCfg.audio.clipSeconds`, not the mutable
+  `settings.audioSeconds`, so changing the clip control after training cannot feed
+  the model a differently anchored clip.
 
 Commit history (newest first):
 
@@ -82,8 +98,8 @@ green, and only with the maintainer's go ahead.
 ```
 npm install
 npm run typecheck                # vue-tsc, expect 0 errors
-npm run test                     # Vitest unit tests, expect 64 passing
-node scripts/smoke.mjs           # shell smoke (12 checks)
+npm run test                     # Vitest unit tests, expect 69 passing
+node scripts/smoke.mjs           # shell smoke (13 checks)
 node scripts/smoke-image.mjs     # image flow end to end (7)
 node scripts/smoke-audio.mjs     # audio keyword spotting (6)
 node scripts/smoke-mt.mjs        # motion and text (10)
@@ -95,7 +111,7 @@ node scripts/smoke-motion-idle.mjs # motion: shake vs near-still idle (5)
 npm run dev                      # http://localhost:5173 (or next free port)
 ```
 
-Last known good: typecheck 0, 64 unit tests, and all nine smokes green. The smokes
+Last known good: typecheck 0, 69 unit tests, and all nine smokes green. The smokes
 use the system Chrome through Playwright (`channel: 'chrome', headless: true`),
 start their own Vite server, and inject learnable data through the real file or
 text import UI, since a headless browser has no camera, microphone, or motion
@@ -190,6 +206,12 @@ These were each a bug or a near miss. Keep them true.
    stretched a near-still window to full contrast, so an Idle class looked like a
    gesture. `smoke-motion-idle.mjs` guards it: a still window must predict Idle,
    not the gesture. Do not reintroduce per-window min-max for motion.
+15. Live inference and export read the FROZEN `featureCfg` captured at train time,
+   never the mutable settings. The Standard knobs (clip length, image size, etc.)
+   change `settings` and apply only on the next train; Test, the Playground, and
+   the exported bundle must derive their config (notably the audio clip length)
+   from `featureCfg`, or a settings change after training silently feeds the model
+   input it was not trained on.
 
 ## Hard boundary with the library
 
@@ -217,8 +239,6 @@ reverted).
   by the headless smokes. Test capture on real hardware.
 - Flash the generated C array and TFLite Micro sketch to an actual ESP32. The
   output is op compatible and arena estimated, not yet flashed.
-- Per class precision, recall, and F1 for text (the confusion matrix is shown;
-  explicit per class metrics could be added).
 - Deferred audit nits, confirmed to have no functional or parity impact:
   calibration uses one representative batch (a memory concern only at large
   dataset sizes), the audio and motion resamplers use different endpoint

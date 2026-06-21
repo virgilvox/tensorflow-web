@@ -97,6 +97,20 @@ try {
     // The supported layer list is read live from the library.
     check('library layer set surfaced', /Conv2D/.test(modelText ?? '') && /Dense/.test(modelText ?? ''));
 
+    // Standard feature controls are real, not placeholder text: changing the image
+    // size changes the live input shape preview.
+    await page.getByRole('link', { name: /Features/ }).click();
+    await page.waitForSelector('[data-test="feature-shape"]');
+    const shapeBefore = await page.textContent('[data-test="feature-shape"]');
+    await page.selectOption('select[aria-label="Image size"]', '32');
+    await page.waitForTimeout(100);
+    const shapeAfter = await page.textContent('[data-test="feature-shape"]');
+    check(
+      'Standard feature controls change the input shape',
+      shapeBefore !== shapeAfter && /32/.test(shapeAfter ?? ''),
+      `${shapeBefore?.trim()} -> ${shapeAfter?.trim()}`,
+    );
+
     // Data stage works: add a class and see it listed.
     await page.getByRole('link', { name: /Data/ }).click();
     await page.waitForSelector('.modgrid');

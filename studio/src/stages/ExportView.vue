@@ -79,7 +79,8 @@ function dlBundle(): void {
     classes: pipeline.classNames.value,
     featureConfig: cfg,
     inputShape: pipeline.fShape.value,
-    audioSeconds: project.modality === 'audio' ? settings.audioSeconds : undefined,
+    // Carry the clip length the model was trained at, from the frozen config.
+    audioSeconds: cfg.kind === 'audio' ? cfg.audio.clipSeconds : undefined,
     bytes: pipeline.bytes.value,
   });
 }

@@ -56,8 +56,11 @@ Train, Test, and Export. The Data stage shows a clear readiness cue: how many
 samples each class still needs and a Train action that lights up when the dataset
 clears the bar. The altitude control in the top bar drives progressive
 disclosure: Guided hides the configuration stages and chooses everything for you,
-Standard shows the main knobs, and Expert opens the operator inspector and the
-rest of the levers. The negative class (Neither, Background Noise, Idle, Other)
+Standard exposes the real knobs (image size and color, audio clip length and
+mel-or-MFCC, motion window length, text vocabulary cap, and a model size lever)
+with a live input-shape preview, and Expert opens the operator inspector and the
+rest of the levers. The defaults match the auto pipeline, so raising the altitude
+never changes a thing until you do. The negative class (Neither, Background Noise, Idle, Other)
 is a scaffolded first class step for every modality, and the train and test split
 is by capture session, never a random row, so the same subject does not leak
 across the split.
@@ -87,7 +90,8 @@ against the float reference before it is shown as shippable. Parity is enforced,
 not just displayed: if the int8 model does not match the float reference within
 tolerance, the artifact is not offered for download and is not loaded for live
 inference, and the failure is shown plainly. The float versus int8 accuracy delta
-is displayed, never hidden, and a device budget meter reports the exact flash size
+is displayed, never hidden, the Test stage shows the confusion matrix and per-class
+precision, recall, and F1, and a device budget meter reports the exact flash size
 and an estimated runtime arena against a selected target (ESP32 S3, ESP32, Cortex
 M7, or Cortex M4), green when it fits and red when it does not.
 
@@ -107,7 +111,7 @@ src/
   features/                     pure, testable extractors per modality
   models/                       presets and the constrained, guarded builder
   lib/                          dsp, tensors, storage, split, cformat, format,
-                                modelBundle
+                                modelBundle, metrics
 ```
 
 The design system knows nothing about machine learning, the feature extractors

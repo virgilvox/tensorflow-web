@@ -16,13 +16,15 @@ import { useSettingsStore } from '../stores/settings';
 import { usePipeline } from '../composables/usePipeline';
 import { MODALITIES } from '../lib/modalities';
 import { formatBytes } from '../lib/format';
-import type { ModelSummary } from '../models/types';
+import type { ModelSummary, ModelCapacity } from '../models/types';
 import type { LayerInfo } from '../models/builder';
 
 const project = useProjectStore();
 const settings = useSettingsStore();
 const pipeline = usePipeline();
 const info = computed(() => MODALITIES[project.modality]);
+
+const CAPACITIES: ModelCapacity[] = ['compact', 'standard', 'large'];
 
 // The twelve exportable layers, read from the library registry, not hard coded.
 const layers = supportedLayers().slice().sort();
@@ -63,6 +65,26 @@ watchEffect(() => {
         <span class="stat"><span class="lab">int8 weights</span><span class="sv mono-num">{{ formatBytes(summary.estimatedWeightBytes) }}</span></span>
         <span class="stat"><span class="lab">layers</span><span class="sv mono-num">{{ summary.layerCount }}</span></span>
       </div>
+    </TwCard>
+
+    <TwCard v-if="settings.editable" title="Model size" meta="standard" class="mt">
+      <div class="caps">
+        <button
+          v-for="c in CAPACITIES"
+          :key="c"
+          type="button"
+          class="capchip"
+          :class="{ on: settings.modelCapacity === c }"
+          :aria-pressed="settings.modelCapacity === c"
+          @click="settings.modelCapacity = c"
+        >
+          {{ c }}
+        </button>
+      </div>
+      <p class="reason mt">
+        Compact shrinks the hidden layers for the tightest targets; large trades size for accuracy.
+        The summary above updates live. Applies the next time you train.
+      </p>
     </TwCard>
 
     <TwCard title="Exportable layers" meta="library constraint" class="mt">
@@ -127,6 +149,29 @@ watchEffect(() => {
   flex-wrap: wrap;
   gap: var(--s-2);
   margin-top: var(--s-3);
+}
+.caps {
+  display: inline-flex;
+  gap: 6px;
+}
+.capchip {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  text-transform: capitalize;
+  color: var(--steam);
+  background: var(--gunmetal);
+  border: 1px solid var(--seam);
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: color var(--fast), border-color var(--fast);
+}
+.capchip:hover {
+  border-color: var(--edge);
+  color: var(--chalk);
+}
+.capchip.on {
+  border-color: var(--live);
+  color: var(--live);
 }
 .stats {
   display: flex;

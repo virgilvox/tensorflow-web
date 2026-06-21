@@ -54,17 +54,34 @@ export function defaultFeatureConfig(modality: Modality): FeatureConfig {
   }
 }
 
-/** Options that tune a built feature config beyond what the samples imply. */
+/**
+ * Options that tune a built feature config beyond what the samples imply. These
+ * are the Standard-altitude knobs; every field defaults to the auto value, so an
+ * empty options object reproduces the Guided pipeline exactly.
+ */
 export interface FeatureConfigOptions {
   /** Audio clip length in seconds the spectrogram grid is anchored to. */
   audioSeconds?: number;
+  /** Image output side length in pixels. */
+  imageSize?: number;
+  /** Image channels: 1 grayscale, 3 RGB. */
+  imageChannels?: 1 | 3;
+  /** Audio output: a mel spectrogram or MFCCs. */
+  audioMode?: 'mel' | 'mfcc';
+  /** Number of mel bands in the spectrogram analysis. */
+  audioBands?: number;
+  /** Motion resampled steps per axis. */
+  motionSteps?: number;
+  /** Maximum text vocabulary size. */
+  textVocabCap?: number;
 }
 
 /**
- * Builds a feature config for a modality from training samples. Text builds its
- * vocabulary from the supplied samples (pass the train split to keep the test set
- * out of it); audio anchors its grid to the configured clip length; the others
- * return their static default.
+ * Builds a feature config for a modality from training samples and the Standard
+ * knobs. Text builds its vocabulary from the supplied samples (pass the train
+ * split to keep the test set out of it); audio anchors its grid to the clip
+ * length; motion fixes a per-axis scale from the data. Unset options fall back to
+ * the auto defaults.
  */
 export function buildFeatureConfig(
   modality: Modality,
@@ -75,11 +92,23 @@ export function buildFeatureConfig(
     const texts = samples
       .map((s) => (s.payload.kind === 'text' ? s.payload.text : ''))
       .filter((t) => t.length > 0);
-    return { kind: 'text', text: { vocab: buildVocabulary(texts) } };
+    return { kind: 'text', text: { vocab: buildVocabulary(texts, options.textVocabCap) } };
+  }
+  if (modality === 'image') {
+    return {
+      kind: 'image',
+      image: {
+        ...DEFAULT_IMAGE_CONFIG,
+        size: options.imageSize ?? DEFAULT_IMAGE_CONFIG.size,
+        channels: options.imageChannels ?? DEFAULT_IMAGE_CONFIG.channels,
+      },
+    };
   }
   if (modality === 'audio') {
     const clipSeconds = options.audioSeconds ?? DEFAULT_AUDIO_CONFIG.clipSeconds;
-    return { kind: 'audio', audio: { ...DEFAULT_AUDIO_CONFIG, clipSeconds } };
+    const mode = options.audioMode ?? DEFAULT_AUDIO_CONFIG.mode;
+    const numMel = options.audioBands ?? DEFAULT_AUDIO_CONFIG.numMel;
+    return { kind: 'audio', audio: { ...DEFAULT_AUDIO_CONFIG, clipSeconds, mode, numMel } };
   }
   if (modality === 'motion') {
     // Fix a per-axis acceleration scale from the training set: each axis's largest
@@ -104,7 +133,8 @@ export function buildFeatureConfig(
     const globalMax = Math.max(...axisMax, 1e-6);
     const floor = 0.25 * globalMax;
     const scales = axisMax.map((m) => Math.max(m, floor, 1e-6));
-    return { kind: 'motion', motion: { ...DEFAULT_MOTION_CONFIG, scales } };
+    const targetLen = options.motionSteps ?? DEFAULT_MOTION_CONFIG.targetLen;
+    return { kind: 'motion', motion: { ...DEFAULT_MOTION_CONFIG, targetLen, scales } };
   }
   return defaultFeatureConfig(modality);
 }

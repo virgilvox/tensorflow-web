@@ -5,6 +5,7 @@
  */
 import { defineStore } from 'pinia';
 import type { AltitudeLevel, TargetDevice, TargetDeviceId } from '../types';
+import type { ModelCapacity } from '../models/types';
 
 /** The microcontroller targets the studio knows how to size a model against. */
 export const TARGET_DEVICES: readonly TargetDevice[] = [
@@ -28,6 +29,16 @@ interface SettingsState {
   targetId: TargetDeviceId;
   /** Microphone clip length for new audio captures, in seconds. */
   audioSeconds: number;
+  // Feature knobs, editable from Standard up. Defaults match the auto pipeline,
+  // so leaving them alone reproduces the Guided behavior exactly.
+  imageSize: number;
+  imageChannels: 1 | 3;
+  audioMode: 'mel' | 'mfcc';
+  audioBands: number;
+  motionSteps: number;
+  textVocabCap: number;
+  /** Model size lever. */
+  modelCapacity: ModelCapacity;
 }
 
 export const useSettingsStore = defineStore('settings', {
@@ -35,6 +46,13 @@ export const useSettingsStore = defineStore('settings', {
     altitude: 'guided',
     targetId: 'esp32s3',
     audioSeconds: 1,
+    imageSize: 48,
+    imageChannels: 1,
+    audioMode: 'mel',
+    audioBands: 32,
+    motionSteps: 32,
+    textVocabCap: 200,
+    modelCapacity: 'standard',
   }),
   getters: {
     /** True when configuration stages (Features, Model) are visible at all. */

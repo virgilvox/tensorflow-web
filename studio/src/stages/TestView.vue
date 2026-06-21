@@ -24,6 +24,7 @@ import { fileToFrame } from '../lib/imageDecode';
 import { fileToAudio } from '../lib/audioDecode';
 import { fileToMotion } from '../lib/motionImport';
 import { formatPercent } from '../lib/format';
+import { perClassMetrics } from '../lib/metrics';
 
 const project = useProjectStore();
 const settings = useSettingsStore();
@@ -52,6 +53,20 @@ const classNames = computed(() =>
 );
 const report = computed(() => training.report);
 const live = computed(() => pipeline.hasModel.value);
+// Capture at the length the model was TRAINED at (frozen in featureCfg), not the
+// live setting, so changing the clip control after training cannot feed the model
+// a differently anchored clip than it learned on.
+const audioClipSeconds = computed(() => {
+  const cfg = pipeline.featureCfg.value;
+  return cfg?.kind === 'audio' ? cfg.audio.clipSeconds : settings.audioSeconds;
+});
+// Per class precision, recall, and F1 from the confusion matrix verify produced,
+// labelled with the frozen train-time class order.
+const classMetrics = computed(() => {
+  const conf = report.value?.confusion;
+  if (!conf) return [];
+  return perClassMetrics(conf).map((m, i) => ({ name: classNames.value[i] ?? `class ${i}`, ...m }));
+});
 const top = computed(() =>
   predictions.value.reduce<{ name: string; score: number } | null>(
     (best, p) => (!best || p.score > best.score ? p : best),
@@ -97,7 +112,7 @@ async function recordAndPredict(): Promise<void> {
   error.value = null;
   recording.value = true;
   try {
-    const clip = await mic.record(settings.audioSeconds);
+    const clip = await mic.record(audioClipSeconds.value);
     predictions.value = await pipeline.predictAudio(clip.data, clip.sampleRate);
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
@@ -295,6 +310,23 @@ async function predictTextLive(): Promise<void> {
     <TwCard v-if="report?.confusion" title="Confusion matrix" meta="rows are true class" class="mt">
       <TwConfusion :matrix="report.confusion" :labels="classNames" />
     </TwCard>
+
+    <TwCard v-if="classMetrics.length" title="Per class metrics" meta="from the confusion matrix" class="mt">
+      <table class="metrics" data-test="class-metrics">
+        <thead>
+          <tr><th>class</th><th>precision</th><th>recall</th><th>F1</th><th>support</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="m in classMetrics" :key="m.name">
+            <td class="cn">{{ m.name }}</td>
+            <td class="mono-num">{{ formatPercent(m.precision) }}</td>
+            <td class="mono-num">{{ formatPercent(m.recall) }}</td>
+            <td class="mono-num">{{ formatPercent(m.f1) }}</td>
+            <td class="mono-num">{{ m.support }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </TwCard>
   </section>
 </template>
 
@@ -427,6 +459,30 @@ async function predictTextLive(): Promise<void> {
   font-family: var(--f-display);
   font-weight: 700;
   font-size: var(--t-2xl);
+  color: var(--chalk);
+}
+.metrics {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--f-mono);
+  font-size: 11.5px;
+}
+.metrics th {
+  text-align: left;
+  font-family: var(--f-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 8.5px;
+  color: var(--ash);
+  border-bottom: 1px solid var(--seam);
+  padding: 6px 10px 6px 0;
+}
+.metrics td {
+  color: var(--steam);
+  border-bottom: 1px solid var(--seam);
+  padding: 6px 10px 6px 0;
+}
+.metrics .cn {
   color: var(--chalk);
 }
 </style>

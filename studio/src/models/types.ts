@@ -20,6 +20,9 @@ export interface ModelSpec {
   layers: LayerSpec[];
 }
 
+/** Model size lever: scales the preset's filter and unit counts. */
+export type ModelCapacity = 'compact' | 'standard' | 'large';
+
 /** Input tensor shape without the batch dimension: [height, width, channels]. */
 export type InputShape = [number, number, number];
 

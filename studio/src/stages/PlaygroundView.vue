@@ -117,7 +117,8 @@ async function useCurrent(): Promise<void> {
       classes: pipeline.classNames.value,
       featureConfig: cfg,
       inputShape: pipeline.fShape.value,
-      audioSeconds: project.modality === 'audio' ? settings.audioSeconds : undefined,
+      // Use the clip length frozen in the trained config, not the live setting.
+      audioSeconds: cfg.kind === 'audio' ? cfg.audio.clipSeconds : undefined,
       bytes: pipeline.bytes.value,
     });
   } catch (err) {

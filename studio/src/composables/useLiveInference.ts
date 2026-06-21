@@ -13,11 +13,22 @@ import { useInterpreter, type LoadedModel } from './useInterpreter';
 const loaded = ref(false);
 let model: LoadedModel | null = null;
 
-/** Coerces an interpreter predict result to a single output tensor. */
+/** Coerces a predict result to one output tensor, disposing any others. */
 function asTensor(out: unknown): tf.Tensor {
-  if (Array.isArray(out)) return out[0] as tf.Tensor;
+  if (Array.isArray(out)) {
+    const first = out[0] as tf.Tensor;
+    for (let i = 1; i < out.length; i++) (out[i] as tf.Tensor)?.dispose?.();
+    return first;
+  }
   if (out && typeof (out as tf.Tensor).dataSync === 'function') return out as tf.Tensor;
-  return Object.values(out as Record<string, tf.Tensor>)[0] as tf.Tensor;
+  const values = Object.values(out as Record<string, tf.Tensor>);
+  for (let i = 1; i < values.length; i++) values[i]?.dispose?.();
+  return values[0] as tf.Tensor;
+}
+
+/** Releases a loaded interpreter model's WASM memory, if it exposes dispose. */
+function disposeModel(m: LoadedModel | null): void {
+  (m as (LoadedModel & { dispose?: () => void }) | null)?.dispose?.();
 }
 
 export function useLiveInference() {
@@ -25,12 +36,14 @@ export function useLiveInference() {
 
   /** Loads bytes into the interpreter for subsequent predict calls. */
   async function load(bytes: Uint8Array): Promise<void> {
+    disposeModel(model); // release the previous interpreter before replacing it
     model = await interpreter.loadModel(bytes);
     loaded.value = true;
   }
 
-  /** Drops the loaded model. */
+  /** Drops the loaded model and releases its interpreter memory. */
   function reset(): void {
+    disposeModel(model);
     model = null;
     loaded.value = false;
   }

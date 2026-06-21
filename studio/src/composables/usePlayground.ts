@@ -69,8 +69,14 @@ export function usePlayground() {
     return interpreter.ready();
   }
 
+  /** Releases a loaded interpreter model's WASM memory, if it exposes dispose. */
+  function disposeModel(): void {
+    (model as (LoadedModel & { dispose?: () => void }) | null)?.dispose?.();
+  }
+
   /** Loads bytes into the interpreter and marks the descriptor active. */
   async function loadInto(bytes: Uint8Array, descriptor: ActiveModel): Promise<void> {
+    disposeModel();
     model = await interpreter.loadModel(bytes);
     active.value = descriptor;
   }
@@ -120,6 +126,7 @@ export function usePlayground() {
    * reports, if it exposes one, so the caller can prefill the manual setup.
    */
   async function inspectTflite(bytes: Uint8Array): Promise<number[] | null> {
+    disposeModel();
     model = await interpreter.loadModel(bytes);
     active.value = null;
     const m = model as unknown as { inputs?: { shape?: number[] }[] };
@@ -140,8 +147,9 @@ export function usePlayground() {
     active.value = { ...descriptor, source: 'tflite' };
   }
 
-  /** Unloads the active model. */
+  /** Unloads the active model and releases its interpreter memory. */
   function clear(): void {
+    disposeModel();
     model = null;
     active.value = null;
   }

@@ -32,7 +32,7 @@ import { buildBatchedData } from '../lib/tensors';
 import { sessionAwareSplit } from '../lib/split';
 import { buildModel, summarize, describeLayers, type LayerInfo } from '../models/builder';
 import { imageCnnPreset, mlpPreset } from '../models/presets';
-import type { ModelSpec } from '../models/types';
+import type { ModelSpec, ModelCapacity } from '../models/types';
 import type { Modality } from '../types';
 import { resolverCallsForLayers } from '../lib/cformat';
 import type { Sample } from '../types';
@@ -48,9 +48,9 @@ const SUPPORTED: ReadonlySet<Modality> = new Set<Modality>(['image', 'audio', 'm
  * Chooses an architecture for a feature shape: a small CNN for a 2D grid (image
  * or spectrogram), an MLP for a 1D feature vector (motion summary or text).
  */
-function presetFor(shape: number[], classCount: number): ModelSpec {
-  if (shape.length === 3) return imageCnnPreset(classCount, Math.min(shape[0]!, shape[1]!));
-  return mlpPreset(classCount);
+function presetFor(shape: number[], classCount: number, capacity: ModelCapacity): ModelSpec {
+  if (shape.length === 3) return imageCnnPreset(classCount, Math.min(shape[0]!, shape[1]!), capacity);
+  return mlpPreset(classCount, capacity);
 }
 
 // Shared singleton state: one trained model and one emitted artifact per session.
@@ -122,6 +122,19 @@ export function usePipeline() {
     return project.classes.every((c) => (counts.get(c.id) ?? 0) >= MIN_PER_CLASS);
   }
 
+  /** The Standard feature knobs, read from settings, passed to buildFeatureConfig. */
+  function featureOptions() {
+    return {
+      audioSeconds: settings.audioSeconds,
+      imageSize: settings.imageSize,
+      imageChannels: settings.imageChannels,
+      audioMode: settings.audioMode,
+      audioBands: settings.audioBands,
+      motionSteps: settings.motionSteps,
+      textVocabCap: settings.textVocabCap,
+    };
+  }
+
   /** Sample count per class that can actually train the current model. */
   function usableCounts(): Record<string, number> {
     const counts: Record<string, number> = {};
@@ -133,13 +146,13 @@ export function usePipeline() {
   /** Builds a preset model just to report its size for the Model stage. */
   function previewSummary(): ModelSummary | null {
     if (!SUPPORTED.has(project.modality)) return null;
-    const cfg = buildFeatureConfig(project.modality, project.samples, { audioSeconds: settings.audioSeconds });
+    const cfg = buildFeatureConfig(project.modality, project.samples, featureOptions());
     const shape = featureShape(cfg);
     // A data derived shape (text vocabulary) can be empty before any data; the
     // size estimate only makes sense once the input has a width.
     if (shape.some((d) => d <= 0)) return null;
     const classCount = Math.max(2, project.classes.length);
-    const model = buildModel(presetFor(shape, classCount), shape);
+    const model = buildModel(presetFor(shape, classCount, settings.modelCapacity), shape);
     try {
       return summarize(model);
     } finally {
@@ -150,10 +163,10 @@ export function usePipeline() {
   /** Describes the preset model's layers for the Expert operator inspector. */
   function inspectLayers(): LayerInfo[] {
     if (!SUPPORTED.has(project.modality)) return [];
-    const cfg = buildFeatureConfig(project.modality, project.samples, { audioSeconds: settings.audioSeconds });
+    const cfg = buildFeatureConfig(project.modality, project.samples, featureOptions());
     const shape = featureShape(cfg);
     if (shape.some((d) => d <= 0)) return [];
-    const model = buildModel(presetFor(shape, Math.max(2, project.classes.length)), shape);
+    const model = buildModel(presetFor(shape, Math.max(2, project.classes.length), settings.modelCapacity), shape);
     try {
       return describeLayers(model);
     } finally {
@@ -196,7 +209,7 @@ export function usePipeline() {
 
     // Build the feature config from the train split only, so a text vocabulary
     // never sees the held out test set.
-    const cfg = buildFeatureConfig(project.modality, trainSamples, { audioSeconds: settings.audioSeconds });
+    const cfg = buildFeatureConfig(project.modality, trainSamples, featureOptions());
     const shape = featureShape(cfg);
     if (shape.some((d) => d <= 0)) throw new Error('No usable features; add more varied data.');
     const extract = featureExtractor(cfg);
@@ -216,7 +229,7 @@ export function usePipeline() {
       testXs = testData.xs;
       testYs = testData.ys;
 
-      model = buildModel(presetFor(shape, classCount), shape);
+      model = buildModel(presetFor(shape, classCount, settings.modelCapacity), shape);
 
       classOrder.value = ids;
       classNames.value = project.classes.map((c) => c.name);

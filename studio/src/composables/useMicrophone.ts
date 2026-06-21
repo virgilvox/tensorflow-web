@@ -46,6 +46,12 @@ export function useMicrophone() {
    */
   async function start(): Promise<void> {
     error.value = null;
+    // navigator.mediaDevices is undefined on an insecure origin; surface a clear
+    // message instead of a raw "cannot read getUserMedia of undefined".
+    if (!navigator.mediaDevices?.getUserMedia) {
+      error.value = 'Microphone needs a secure context (https or localhost) and an available microphone.';
+      throw new Error(error.value);
+    }
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       ctx = new AudioContext();
