@@ -79,7 +79,7 @@ function batch(label, make, session, count, base) {
 }
 
 function startVite() {
-  const proc = spawn('npx', ['vite', '--port', '5187', '--strictPort'], {
+  const proc = spawn('npx', ['vite', '--port', '5188', '--strictPort'], {
     cwd: root,
     stdio: ['ignore', 'pipe', 'pipe'],
   });

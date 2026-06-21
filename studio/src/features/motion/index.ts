@@ -12,10 +12,19 @@ export interface MotionFeatureConfig {
   targetLen: number;
   /** Number of axes captured (3 for accelerometer x, y, z). */
   axes: number;
+  /**
+   * Fixed full-scale acceleration per axis the window is divided by, in the data's
+   * own units. Set once from the training set (each axis's largest magnitude, with
+   * a floor so a globally quiet axis is not amplified), not from each window, so a
+   * near-still Idle window stays compressed near the midpoint instead of being
+   * stretched to full range and looking like a gesture, while an active axis keeps
+   * its full contrast.
+   */
+  scales: number[];
 }
 
-/** The default motion config: 32 steps over three axes. */
-export const DEFAULT_MOTION_CONFIG: MotionFeatureConfig = { targetLen: 32, axes: 3 };
+/** The default motion config: 32 steps over three axes, unit scale per axis. */
+export const DEFAULT_MOTION_CONFIG: MotionFeatureConfig = { targetLen: 32, axes: 3, scales: [1, 1, 1] };
 
 /** The tensor shape [targetLen * axes] a config produces, batch aside. */
 export function motionTensorShape(config: MotionFeatureConfig): [number] {
@@ -59,20 +68,20 @@ export function motionToFeatures(
   const steps = Math.floor(data.length / axes);
   const out = new Float32Array(config.targetLen * config.axes);
   const useAxes = Math.min(axes, config.axes);
+  // Divide each axis by its FIXED per-axis scale and centre at 0.5, rather than a
+  // per-window min-max. Zero maps to 0.5, +scale to 1, -scale to 0. A still window
+  // stays a flat line near the midpoint; only real motion spreads across the
+  // range, so an Idle class is not stretched to look like a gesture, while an
+  // active axis keeps its full contrast.
   for (let a = 0; a < useAxes; a++) {
+    const s = config.scales[a];
+    const scale = s !== undefined && s > 1e-9 ? s : 1;
     const series: number[] = new Array(steps);
     for (let t = 0; t < steps; t++) series[t] = data[t * axes + a] ?? 0;
     const resampled = resampleSeries(series, config.targetLen);
-    let min = Infinity;
-    let max = -Infinity;
-    for (const v of resampled) {
-      if (v < min) min = v;
-      if (v > max) max = v;
-    }
-    const range = max - min;
     const base = a * config.targetLen;
     for (let i = 0; i < config.targetLen; i++) {
-      out[base + i] = range > 1e-9 ? (resampled[i]! - min) / range : 0;
+      out[base + i] = Math.min(1, Math.max(0, 0.5 + resampled[i]! / (2 * scale)));
     }
   }
   return out;

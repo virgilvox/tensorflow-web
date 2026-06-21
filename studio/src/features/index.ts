@@ -81,6 +81,31 @@ export function buildFeatureConfig(
     const clipSeconds = options.audioSeconds ?? DEFAULT_AUDIO_CONFIG.clipSeconds;
     return { kind: 'audio', audio: { ...DEFAULT_AUDIO_CONFIG, clipSeconds } };
   }
+  if (modality === 'motion') {
+    // Fix a per-axis acceleration scale from the training set: each axis's largest
+    // magnitude, floored at a fraction of the overall max so a globally quiet axis
+    // is not amplified. Every window is then divided by this fixed reference, not
+    // its own range, so an active axis keeps full contrast while a near-still
+    // window stays flat near the midpoint.
+    const axisCount = DEFAULT_MOTION_CONFIG.axes;
+    const axisMax = new Array<number>(axisCount).fill(0);
+    for (const s of samples) {
+      if (s.payload.kind !== 'motion') continue;
+      const d = s.payload.data;
+      const ax = s.payload.axes || axisCount;
+      for (let i = 0; i < d.length; i++) {
+        const a = i % ax;
+        if (a < axisCount) {
+          const v = Math.abs(d[i]!);
+          if (v > axisMax[a]!) axisMax[a] = v;
+        }
+      }
+    }
+    const globalMax = Math.max(...axisMax, 1e-6);
+    const floor = 0.25 * globalMax;
+    const scales = axisMax.map((m) => Math.max(m, floor, 1e-6));
+    return { kind: 'motion', motion: { ...DEFAULT_MOTION_CONFIG, scales } };
+  }
   return defaultFeatureConfig(modality);
 }
 

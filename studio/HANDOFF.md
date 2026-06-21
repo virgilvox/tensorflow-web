@@ -77,10 +77,11 @@ node scripts/smoke-expert.mjs    # expert depth + project save/load (5)
 node scripts/smoke-persist.mjs   # reload persistence regression (4)
 node scripts/smoke-playground.mjs # playground: current model + reloaded bundle (6)
 node scripts/smoke-audio-bg.mjs  # audio: loud keyword vs quiet background (5)
+node scripts/smoke-motion-idle.mjs # motion: shake vs near-still idle (5)
 npm run dev                      # http://localhost:5173 (or next free port)
 ```
 
-Last known good: typecheck 0, 60 unit tests, and all eight smokes green. The smokes
+Last known good: typecheck 0, 60 unit tests, and all nine smokes green. The smokes
 use the system Chrome through Playwright (`channel: 'chrome', headless: true`),
 start their own Vite server, and inject learnable data through the real file or
 text import UI, since a headless browser has no camera, microphone, or motion
@@ -169,6 +170,12 @@ These were each a bug or a near miss. Keep them true.
    keyword for near-silence (a real, reported bug). `smoke-audio-bg.mjs` guards it:
    a quiet clip must predict the background class, not the keyword. Do not
    reintroduce per-clip min-max for mel features.
+14. Motion features use a per-axis FIXED scale set from the training set (each
+   axis's max magnitude, floored at a fraction of the overall max), carried in
+   `MotionFeatureConfig.scales`, never a per-window min-max. Per-window min-max
+   stretched a near-still window to full contrast, so an Idle class looked like a
+   gesture. `smoke-motion-idle.mjs` guards it: a still window must predict Idle,
+   not the gesture. Do not reintroduce per-window min-max for motion.
 
 ## Hard boundary with the library
 
