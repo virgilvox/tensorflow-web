@@ -48,6 +48,20 @@ Added after the original five phases (audit driven and on request):
   resets the training store); import failure now surfaces an inline error instead
   of failing silently; the class row delete is a real button and the modality and
   class controls carry `aria-pressed`.
+- A styled in-app confirm dialog (`useConfirm`, `TwConfirm.vue`, mounted in
+  `App.vue`) replaces the native `window.confirm` for New project and modality
+  switch: focus managed, Escape and backdrop cancel, destructive button styled.
+  No `window.confirm` remains.
+- Project file parsing hardened: `deserializePayload` validates the numeric
+  payload fields, and `parseProject` validates the modality, each class shape, and
+  that every sample's payload kind matches the project modality, so a corrupt or
+  foreign file fails loudly at load rather than crashing later.
+- The mel low-band "collapse" flagged in an early audit was checked numerically
+  and does not occur at the studio's config (the points at 32 bands / 512 FFT /
+  20 Hz are already strictly increasing: 0, 2, 4, 6, 8, 11, ...). A guard was tried
+  and reverted because it was a no-op there and would relocate the collapse to the
+  top band at extreme configs. An invariant test asserts the default config stays
+  collapse-free.
 
 Commit history (newest first):
 
@@ -68,8 +82,8 @@ green, and only with the maintainer's go ahead.
 ```
 npm install
 npm run typecheck                # vue-tsc, expect 0 errors
-npm run test                     # Vitest unit tests, expect 60 passing
-node scripts/smoke.mjs           # shell smoke (10 checks)
+npm run test                     # Vitest unit tests, expect 64 passing
+node scripts/smoke.mjs           # shell smoke (12 checks)
 node scripts/smoke-image.mjs     # image flow end to end (7)
 node scripts/smoke-audio.mjs     # audio keyword spotting (6)
 node scripts/smoke-mt.mjs        # motion and text (10)
@@ -81,7 +95,7 @@ node scripts/smoke-motion-idle.mjs # motion: shake vs near-still idle (5)
 npm run dev                      # http://localhost:5173 (or next free port)
 ```
 
-Last known good: typecheck 0, 60 unit tests, and all nine smokes green. The smokes
+Last known good: typecheck 0, 64 unit tests, and all nine smokes green. The smokes
 use the system Chrome through Playwright (`channel: 'chrome', headless: true`),
 start their own Vite server, and inject learnable data through the real file or
 text import UI, since a headless browser has no camera, microphone, or motion
@@ -192,8 +206,6 @@ reverted).
   in `PLAN.md` section 16.6. Not started.
 - A full editable layer editor. Today the Expert path shows a read only operator
   inspector; the plan flags the editor as a stretch.
-- Replace the native `window.confirm` prompts (modality switch, New project) with
-  styled in app modals. Still the one native UI; everything else is in app.
 - Bare `.tflite` support in the Playground is pragmatic: the user picks the
   modality, preprocessing, and labels (image preprocessing is prefilled from the
   interpreter's reported input shape when available). Audio and motion fall back

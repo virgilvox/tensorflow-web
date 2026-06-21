@@ -48,12 +48,23 @@ function invalid(): never {
   throw new Error('Not a recognized TF Web Studio project file.');
 }
 
+/** The modalities a project file may declare. */
+const MODALITIES: ReadonlySet<string> = new Set(['image', 'audio', 'motion', 'text']);
+
+/** True for a finite, positive number. Used for dimensions and rates. */
+function isPosNum(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0;
+}
+
 /** Rebuilds a payload's typed arrays from the JSON shape, validating its shape. */
 function deserializePayload(payload: SerializedPayload): SamplePayload {
   if (!payload || typeof payload !== 'object') invalid();
   switch (payload.kind) {
     case 'image':
-      if (!Array.isArray(payload.data)) invalid();
+      // Validate the dimensions, not just the data array: a corrupt file with a
+      // non-numeric width would otherwise load and crash later in feature
+      // extraction. Fail loudly here, as the parser promises.
+      if (!Array.isArray(payload.data) || !isPosNum(payload.width) || !isPosNum(payload.height)) invalid();
       return {
         kind: 'image',
         width: payload.width,
@@ -61,10 +72,10 @@ function deserializePayload(payload: SerializedPayload): SamplePayload {
         data: new Uint8ClampedArray(payload.data),
       };
     case 'audio':
-      if (!Array.isArray(payload.data)) invalid();
+      if (!Array.isArray(payload.data) || !isPosNum(payload.sampleRate)) invalid();
       return { kind: 'audio', sampleRate: payload.sampleRate, data: Float32Array.from(payload.data) };
     case 'motion':
-      if (!Array.isArray(payload.data)) invalid();
+      if (!Array.isArray(payload.data) || !isPosNum(payload.hz) || !isPosNum(payload.axes)) invalid();
       return { kind: 'motion', hz: payload.hz, axes: payload.axes, data: Float32Array.from(payload.data) };
     case 'text':
       if (typeof payload.text !== 'string') invalid();
@@ -112,9 +123,24 @@ export function parseProject(input: unknown): {
   samples: Sample[];
 } {
   const file = input as Partial<ProjectFile>;
-  if (!file || file.version !== 1 || !Array.isArray(file.classes) || !Array.isArray(file.samples)) {
+  if (
+    !file ||
+    file.version !== 1 ||
+    typeof file.modality !== 'string' ||
+    !MODALITIES.has(file.modality) ||
+    !Array.isArray(file.classes) ||
+    !Array.isArray(file.samples)
+  ) {
     invalid();
   }
+  // Validate each class shape so a foreign or corrupt file cannot load a class
+  // that is missing an id, name, or the negative flag the flow relies on.
+  const classes: ClassDef[] = file.classes.map((c) => {
+    if (!c || typeof c.id !== 'string' || typeof c.name !== 'string' || typeof c.negative !== 'boolean') {
+      invalid();
+    }
+    return { id: c.id, name: c.name, negative: c.negative };
+  });
   const samples: Sample[] = file.samples.map((s) => {
     if (
       !s ||
@@ -125,18 +151,23 @@ export function parseProject(input: unknown): {
     ) {
       invalid();
     }
+    const payload = deserializePayload(s.payload);
+    // A project is single modality; every sample must match it. A foreign or
+    // hand-edited file mixing kinds would otherwise load a sample that crashes in
+    // feature extraction for the active modality.
+    if (payload.kind !== file.modality) invalid();
     return {
       id: s.id,
       classId: s.classId,
       sessionId: s.sessionId,
       createdAt: s.createdAt,
-      payload: deserializePayload(s.payload),
+      payload,
     };
   });
   return {
-    name: file.name ?? 'untitled',
-    modality: (file.modality ?? 'image') as Modality,
-    classes: file.classes.map((c) => ({ ...c })),
+    name: typeof file.name === 'string' ? file.name : 'untitled',
+    modality: file.modality as Modality,
+    classes,
     samples,
   };
 }

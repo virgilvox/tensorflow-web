@@ -13,6 +13,7 @@ import { useProjectStore } from '../../stores/project';
 import { useProjectFile } from '../../composables/useProjectFile';
 import { useDataset } from '../../composables/useDataset';
 import { usePipeline } from '../../composables/usePipeline';
+import { useConfirm } from '../../composables/useConfirm';
 import type { AltitudeLevel, TargetDeviceId } from '../../types';
 
 const settings = useSettingsStore();
@@ -20,6 +21,7 @@ const project = useProjectStore();
 const projectFile = useProjectFile();
 const dataset = useDataset();
 const pipeline = usePipeline();
+const { confirm } = useConfirm();
 const importInput = useTemplateRef<HTMLInputElement>('importInput');
 const importError = ref<string | null>(null);
 
@@ -54,7 +56,13 @@ async function onNew(): Promise<void> {
     importError.value = 'Finish the current training or export before starting a new project.';
     return;
   }
-  if (!window.confirm('Start a new project? This clears the current classes and samples.')) return;
+  const ok = await confirm({
+    title: 'Start a new project?',
+    message: 'This clears the current classes and samples. This cannot be undone.',
+    confirmLabel: 'New project',
+    danger: true,
+  });
+  if (!ok) return;
   await dataset.clearAll();
   // Drop the trained model along with the data it was trained on.
   pipeline.reset();

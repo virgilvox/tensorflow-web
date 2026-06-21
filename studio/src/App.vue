@@ -9,6 +9,7 @@ import TwTopBar from './design/components/TwTopBar.vue';
 import TwNavRail from './design/components/TwNavRail.vue';
 import TwBenchRail from './design/components/TwBenchRail.vue';
 import TwGrip from './design/components/TwGrip.vue';
+import TwConfirm from './design/components/TwConfirm.vue';
 </script>
 
 <template>
@@ -24,6 +25,7 @@ import TwGrip from './design/components/TwGrip.vue';
     </main>
   </div>
   <TwBenchRail />
+  <TwConfirm />
 </template>
 
 <style scoped>

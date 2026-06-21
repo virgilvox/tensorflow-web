@@ -54,6 +54,17 @@ describe('melFilterbank', () => {
     const total = filters.reduce((s, f) => s + f.reduce((a, b) => a + b, 0), 0);
     expect(total).toBeGreaterThan(0);
   });
+
+  it('has no collapsed all-zero filter at the default config', () => {
+    // Invariant: at the studio's 32 bands / 512 FFT / 20 Hz config the mel points
+    // are already strictly increasing, so every filter carries weight. This guards
+    // against a future config change that would round adjacent points to the same
+    // bin and leave a band a constant for every clip.
+    const filters = melFilterbank(OPTS);
+    for (const f of filters) {
+      expect(f.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('dct2', () => {

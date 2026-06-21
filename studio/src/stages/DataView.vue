@@ -24,6 +24,7 @@ import {
 } from '../stores/settings';
 import { useDataset } from '../composables/useDataset';
 import { usePipeline, MIN_PER_CLASS } from '../composables/usePipeline';
+import { useConfirm } from '../composables/useConfirm';
 import { useCamera, CAPTURE_SIZE } from '../composables/useCamera';
 import { useMicrophone } from '../composables/useMicrophone';
 import { useMotion } from '../composables/useMotion';
@@ -37,6 +38,7 @@ const project = useProjectStore();
 const settings = useSettingsStore();
 const dataset = useDataset();
 const pipeline = usePipeline();
+const { confirm } = useConfirm();
 const router = useRouter();
 const camera = useCamera();
 const mic = useMicrophone();
@@ -77,9 +79,12 @@ async function pickModality(m: Modality): Promise<void> {
   // with data present clears it, after confirmation, so no sample is ever left
   // attached to the wrong modality.
   if (project.samples.length > 0 || project.classes.length > 0) {
-    const ok = window.confirm(
-      `Switching modality clears the current ${project.classes.length} class(es) and ${project.totalSamples} sample(s). Continue?`,
-    );
+    const ok = await confirm({
+      title: 'Switch modality?',
+      message: `This clears the current ${project.classes.length} class(es) and ${project.totalSamples} sample(s). This cannot be undone.`,
+      confirmLabel: 'Switch and clear',
+      danger: true,
+    });
     if (!ok) return;
     await dataset.clearAll();
     // A model trained on the old modality must not survive the switch.

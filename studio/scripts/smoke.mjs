@@ -106,6 +106,21 @@ try {
     const classList = await page.textContent('.classlist');
     check('Data stage adds a class', /cup/.test(classList ?? ''));
 
+    // The styled confirm dialog guards destructive actions, replacing window.confirm.
+    await page.getByRole('button', { name: 'New project' }).click();
+    await page.waitForSelector('[data-test="confirm-dialog"]', { timeout: 5000 });
+    await page.locator('[data-test="confirm-cancel"]').click();
+    await page.waitForTimeout(120);
+    const afterCancel = (await page.textContent('.classlist')) ?? '';
+    const dialogGone = (await page.locator('[data-test="confirm-dialog"]').count()) === 0;
+    check('confirm dialog cancel keeps the data', /cup/.test(afterCancel) && dialogGone);
+
+    await page.getByRole('button', { name: 'New project' }).click();
+    await page.waitForSelector('[data-test="confirm-dialog"]');
+    await page.locator('[data-test="confirm-ok"]').click();
+    await page.waitForTimeout(150);
+    check('confirm dialog confirm clears the data', (await page.locator('.classlist').count()) === 0);
+
     check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
 
     exitCode = checks.every((c) => c.ok) ? 0 : 1;

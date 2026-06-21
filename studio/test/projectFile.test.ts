@@ -19,7 +19,7 @@ const textSample: Sample = {
 };
 
 describe('project file round trip', () => {
-  it('serializes and parses a project without loss', () => {
+  it('serializes and parses an image project without loss', () => {
     const state = {
       name: 'my project',
       modality: 'image' as const,
@@ -27,7 +27,7 @@ describe('project file round trip', () => {
         { id: 'c1', name: 'A', negative: false },
         { id: 'c2', name: 'Other', negative: true },
       ],
-      samples: [imageSample, textSample],
+      samples: [imageSample],
     };
     const file = serializeProject(state);
     // The on disk form holds plain arrays, not typed arrays.
@@ -38,14 +38,37 @@ describe('project file round trip', () => {
     const restored = parseProject(JSON.parse(JSON.stringify(file)));
     expect(restored.name).toBe('my project');
     expect(restored.classes).toHaveLength(2);
-    expect(restored.samples).toHaveLength(2);
+    expect(restored.samples).toHaveLength(1);
     const img = restored.samples[0]!.payload;
     expect(img.kind).toBe('image');
     if (img.kind === 'image') {
       expect(img.data).toBeInstanceOf(Uint8ClampedArray);
       expect(Array.from(img.data)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     }
-    expect(restored.samples[1]!.payload).toEqual({ kind: 'text', text: 'hello world' });
+  });
+
+  it('round trips a text project', () => {
+    const file = serializeProject({
+      name: 'words',
+      modality: 'text',
+      classes: [{ id: 'c2', name: 'Other', negative: true }],
+      samples: [textSample],
+    });
+    const restored = parseProject(JSON.parse(JSON.stringify(file)));
+    expect(restored.modality).toBe('text');
+    expect(restored.samples[0]!.payload).toEqual({ kind: 'text', text: 'hello world' });
+  });
+
+  it('rejects a sample whose payload kind does not match the modality', () => {
+    expect(() =>
+      parseProject({
+        version: 1,
+        name: 'x',
+        modality: 'image',
+        classes: [],
+        samples: [{ id: 'a', classId: 'c', sessionId: 's', createdAt: 0, payload: { kind: 'text', text: 'hi' } }],
+      }),
+    ).toThrow();
   });
 
   it('rejects input that is not a project file', () => {
@@ -70,6 +93,29 @@ describe('project file round trip', () => {
     // Malformed sample fields.
     expect(() =>
       parseProject({ ...base, samples: [{ id: 5, payload: { kind: 'text', text: 'hi' } }] }),
+    ).toThrow();
+  });
+
+  it('rejects a payload with non-numeric dimensions', () => {
+    const base = { version: 1, name: 'x', modality: 'image', classes: [] };
+    expect(() =>
+      parseProject({
+        ...base,
+        samples: [
+          { id: 'a', classId: 'c', sessionId: 's', createdAt: 0, payload: { kind: 'image', width: 'big', height: 1, data: [0] } },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it('rejects an unknown or missing modality', () => {
+    expect(() => parseProject({ version: 1, name: 'x', modality: 'video', classes: [], samples: [] })).toThrow();
+    expect(() => parseProject({ version: 1, name: 'x', classes: [], samples: [] })).toThrow();
+  });
+
+  it('rejects a class missing its shape', () => {
+    expect(() =>
+      parseProject({ version: 1, name: 'x', modality: 'image', classes: [{ id: 'c', name: 'A' }], samples: [] }),
     ).toThrow();
   });
 });
