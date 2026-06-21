@@ -60,9 +60,21 @@ function newSessionId(): string {
     : `session-${Date.now()}`;
 }
 
-function pickModality(m: Modality): void {
+async function pickModality(m: Modality): Promise<void> {
+  if (m === project.modality) return;
+  // A project is single modality: its samples and classes belong to one. Switching
+  // with data present clears it, after confirmation, so no sample is ever left
+  // attached to the wrong modality.
+  if (project.samples.length > 0 || project.classes.length > 0) {
+    const ok = window.confirm(
+      `Switching modality clears the current ${project.classes.length} class(es) and ${project.totalSamples} sample(s). Continue?`,
+    );
+    if (!ok) return;
+    await dataset.clearAll();
+    activeClassId.value = null;
+  }
   project.setModality(m);
-  void dataset.persistMeta();
+  await dataset.persistMeta();
 }
 
 async function addClass(): Promise<void> {

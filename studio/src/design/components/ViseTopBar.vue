@@ -32,6 +32,12 @@ async function onImport(event: Event): Promise<void> {
   input.value = '';
 }
 
+async function onNew(): Promise<void> {
+  if (project.totalSamples === 0 && project.classes.length === 0) return;
+  if (!window.confirm('Start a new project? This clears the current classes and samples.')) return;
+  await dataset.clearAll();
+}
+
 const ALTITUDES: ReadonlyArray<{ value: AltitudeLevel; label: string }> = [
   { value: 'guided', label: 'Guided' },
   { value: 'standard', label: 'Standard' },
@@ -72,6 +78,9 @@ function onTargetChange(event: Event): void {
             spellcheck="false"
             @change="onRename"
           />
+          <button class="picon" type="button" aria-label="New project" title="New project (clears everything)" @click="onNew">
+            <ViseIcon name="plus" :size="14" />
+          </button>
           <button class="picon" type="button" aria-label="Export project to a file" title="Export project" @click="projectFile.exportToFile()">
             <ViseIcon name="save" :size="14" />
           </button>

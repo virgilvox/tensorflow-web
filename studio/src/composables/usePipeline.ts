@@ -97,10 +97,25 @@ export function usePipeline() {
   const budget = useDeviceBudget();
   const live = useLiveInference();
 
-  /** True when the dataset clears the minimum bar to train. */
+  /**
+   * Samples that can actually train the current model: their class still exists
+   * and their payload matches the current modality. Filtering here keeps a stale
+   * sample (an orphan, or one left from a different modality) from reaching the
+   * tensor builder, where it would throw.
+   */
+  function usableSamples(): Sample[] {
+    const known = new Set(project.classes.map((c) => c.id));
+    return project.samples.filter(
+      (s) => known.has(s.classId) && s.payload.kind === project.modality,
+    );
+  }
+
+  /** True when the usable dataset clears the minimum bar to train. */
   function canTrain(): boolean {
     if (project.classes.length < 2) return false;
-    return project.classes.every((c) => (project.countsByClass[c.id] ?? 0) >= MIN_PER_CLASS);
+    const counts = new Map<string, number>();
+    for (const s of usableSamples()) counts.set(s.classId, (counts.get(s.classId) ?? 0) + 1);
+    return project.classes.every((c) => (counts.get(c.id) ?? 0) >= MIN_PER_CLASS);
   }
 
   /** Builds a preset model just to report its size for the Model stage. */
@@ -156,11 +171,12 @@ export function usePipeline() {
 
     const ids = project.classes.map((c) => c.id);
 
-    // Session aware split, with a random per class fallback if every class has a
-    // single session (which cannot be split without leakage).
-    let { train: trainSamples, test: testSamples } = sessionAwareSplit(project.samples, 0.25);
+    // Session aware split over the usable samples only, with a random per class
+    // fallback if every class has a single session (which cannot be split without
+    // leakage).
+    let { train: trainSamples, test: testSamples } = sessionAwareSplit(usableSamples(), 0.25);
     if (testSamples.length === 0) {
-      ({ trainSamples, testSamples } = randomHoldout(project.samples, 0.25));
+      ({ trainSamples, testSamples } = randomHoldout(usableSamples(), 0.25));
     }
 
     // Build the feature config from the train split only, so a text vocabulary

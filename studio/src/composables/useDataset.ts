@@ -52,6 +52,23 @@ export function useDataset() {
         classes: meta?.classes,
         samples,
       });
+      // Self heal: drop any persisted sample whose class is missing from the
+      // loaded class list. Such orphans cannot be trained or labelled, and they
+      // would otherwise crash the Train stage. This also recovers a dataset left
+      // inconsistent by an older build.
+      const known = new Set(project.classes.map((c) => c.id));
+      const orphans = project.samples.filter((s) => !known.has(s.classId));
+      if (orphans.length > 0) {
+        console.warn(`VISE Studio: dropping ${orphans.length} sample(s) with no matching class.`);
+        for (const orphan of orphans) {
+          project.removeSample(orphan.id);
+          try {
+            await deleteRecord(STORES.samples, orphan.id);
+          } catch {
+            // best effort cleanup
+          }
+        }
+      }
     } catch {
       // A blocked or unavailable database is not fatal; carry on in memory.
     }
@@ -64,12 +81,17 @@ export function useDataset() {
       key: 'project',
       name: project.name,
       modality: project.modality,
-      classes: [...project.classes],
+      // Plain objects, not the store's reactive proxies: IndexedDB structured
+      // clone throws on a Proxy, which previously made every meta write fail
+      // silently and lose the class list on reload.
+      classes: project.classes.map((c) => ({ id: c.id, name: c.name, negative: c.negative })),
     };
     try {
       await putRecord(STORES.meta, meta);
-    } catch {
-      // ignore, in memory state is still correct
+    } catch (err) {
+      // Surface the failure rather than hide it; the in memory state is still
+      // correct but persistence is broken and that must not be silent.
+      console.error('VISE Studio: failed to persist project meta', err);
     }
   }
 
