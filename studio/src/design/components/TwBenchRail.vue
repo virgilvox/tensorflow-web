@@ -77,6 +77,10 @@ const fit = computed(() => {
         <span class="k">Fit</span>
         <TwStatus :state="fit.state">{{ fit.label }}</TwStatus>
       </div>
+
+      <a class="credit" href="https://hack.build" target="_blank" rel="noopener noreferrer">
+        made by hack.build
+      </a>
     </div>
   </footer>
 </template>
@@ -112,5 +116,18 @@ const fit = computed(() => {
   font-weight: 600;
   font-size: 13px;
   color: var(--chalk);
+}
+.credit {
+  margin-left: auto;
+  white-space: nowrap;
+  font-family: var(--f-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 8.5px;
+  color: var(--ash);
+  transition: color var(--fast);
+}
+.credit:hover {
+  color: var(--live);
 }
 </style>
