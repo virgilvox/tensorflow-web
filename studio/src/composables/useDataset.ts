@@ -59,7 +59,7 @@ export function useDataset() {
       const known = new Set(project.classes.map((c) => c.id));
       const orphans = project.samples.filter((s) => !known.has(s.classId));
       if (orphans.length > 0) {
-        console.warn(`VISE Studio: dropping ${orphans.length} sample(s) with no matching class.`);
+        console.warn(`TF Web Studio: dropping ${orphans.length} sample(s) with no matching class.`);
         for (const orphan of orphans) {
           project.removeSample(orphan.id);
           try {
@@ -91,7 +91,7 @@ export function useDataset() {
     } catch (err) {
       // Surface the failure rather than hide it; the in memory state is still
       // correct but persistence is broken and that must not be silent.
-      console.error('VISE Studio: failed to persist project meta', err);
+      console.error('TF Web Studio: failed to persist project meta', err);
     }
   }
 

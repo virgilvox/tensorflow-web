@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseGauge renders a semicircle instrument gauge. A steel background arc sits
+ * TwGauge renders a semicircle instrument gauge. A steel background arc sits
  * behind a foreground arc that sweeps from the left end to a point set by the
  * given fraction. The formatted value is shown large below the arc, with an
  * optional small unit after it.

@@ -142,7 +142,7 @@ try {
       }
       let total = 0;
       for (const [name, examples] of Object.entries(TEXT_CLASSES)) {
-        await page.locator('.classbtn', { hasText: name }).first().click();
+        await page.locator('.selbtn', { hasText: name }).first().click();
         for (const ex of examples) {
           await page.fill('[data-test="text-input"]', ex);
           await page.getByRole('button', { name: /Add example/i }).click();
@@ -181,7 +181,7 @@ try {
       const perBatch = 6;
       const expected = MOTION_CLASSES.length * 2 * perBatch;
       for (let c = 0; c < MOTION_CLASSES.length; c++) {
-        await page.locator('.classbtn', { hasText: MOTION_CLASSES[c] }).first().click();
+        await page.locator('.selbtn', { hasText: MOTION_CLASSES[c] }).first().click();
         for (const session of [0, 1]) {
           const files = Array.from({ length: perBatch }, (_, i) => motionFile(c, c * 1000 + session * 100 + i));
           await page.setInputFiles('input[data-test="import-motion"]', files);

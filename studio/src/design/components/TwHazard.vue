@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseHazard renders a thin diagonal caution hazard stripe bar.
+ * TwHazard renders a thin diagonal caution hazard stripe bar.
  * Use it to mark a running job rail or a live boundary. It is decorative
  * and carries no semantic meaning, so it is hidden from assistive tech.
  * Keep it as a narrow strip. It is never meant to be a large fill area.

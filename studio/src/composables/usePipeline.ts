@@ -61,6 +61,10 @@ const classNames = ref<string[]>([]);
 const featureCfg = ref<FeatureConfig | null>(null);
 const fShape = ref<number[]>([]);
 const hasModel = ref(false);
+// True while train() or exportModel() is running. A single flag both check so a
+// second job cannot start mid-run and so reset() (New project, Import, modality
+// switch) cannot free tensors out from under an in-flight fit or export.
+const busy = ref(false);
 
 // Tensors kept alive between train and export, disposed on the next run.
 let trainXs: tf.Tensor | null = null;
@@ -118,10 +122,18 @@ export function usePipeline() {
     return project.classes.every((c) => (counts.get(c.id) ?? 0) >= MIN_PER_CLASS);
   }
 
+  /** Sample count per class that can actually train the current model. */
+  function usableCounts(): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (const c of project.classes) counts[c.id] = 0;
+    for (const s of usableSamples()) counts[s.classId] = (counts[s.classId] ?? 0) + 1;
+    return counts;
+  }
+
   /** Builds a preset model just to report its size for the Model stage. */
   function previewSummary(): ModelSummary | null {
     if (!SUPPORTED.has(project.modality)) return null;
-    const cfg = buildFeatureConfig(project.modality, project.samples);
+    const cfg = buildFeatureConfig(project.modality, project.samples, { audioSeconds: settings.audioSeconds });
     const shape = featureShape(cfg);
     // A data derived shape (text vocabulary) can be empty before any data; the
     // size estimate only makes sense once the input has a width.
@@ -138,7 +150,7 @@ export function usePipeline() {
   /** Describes the preset model's layers for the Expert operator inspector. */
   function inspectLayers(): LayerInfo[] {
     if (!SUPPORTED.has(project.modality)) return [];
-    const cfg = buildFeatureConfig(project.modality, project.samples);
+    const cfg = buildFeatureConfig(project.modality, project.samples, { audioSeconds: settings.audioSeconds });
     const shape = featureShape(cfg);
     if (shape.some((d) => d <= 0)) return [];
     const model = buildModel(presetFor(shape, Math.max(2, project.classes.length)), shape);
@@ -160,6 +172,9 @@ export function usePipeline() {
       throw new Error(`Training for ${project.modality} lands with its phase.`);
     }
     if (!canTrain()) throw new Error('Not enough data to train yet.');
+    if (busy.value) throw new Error('A job is already running.');
+    busy.value = true;
+    try {
 
     // Reset any prior run, freeing the previous model, its optimizer, and tensors.
     disposeTensors();
@@ -181,7 +196,7 @@ export function usePipeline() {
 
     // Build the feature config from the train split only, so a text vocabulary
     // never sees the held out test set.
-    const cfg = buildFeatureConfig(project.modality, trainSamples);
+    const cfg = buildFeatureConfig(project.modality, trainSamples, { audioSeconds: settings.audioSeconds });
     const shape = featureShape(cfg);
     if (shape.some((d) => d <= 0)) throw new Error('No usable features; add more varied data.');
     const extract = featureExtractor(cfg);
@@ -227,6 +242,9 @@ export function usePipeline() {
       // the inputs stay for calibration at export time.
       trainYs?.dispose();
     }
+    } finally {
+      busy.value = false;
+    }
   }
 
   /**
@@ -244,6 +262,8 @@ export function usePipeline() {
     if (!model || !trainXs || !testXs || !testYs) {
       throw new Error('Train a model before exporting.');
     }
+    if (busy.value) throw new Error('A job is already running.');
+    busy.value = true;
     try {
       const emitted = await quantizer.toInt8Tflite(model, trainXs);
       const report = await verifier.run(emitted, model, { xs: testXs, ys: testYs }, 0.05);
@@ -266,6 +286,8 @@ export function usePipeline() {
       hasModel.value = false;
       live.reset();
       throw err;
+    } finally {
+      busy.value = false;
     }
   }
 
@@ -308,6 +330,30 @@ export function usePipeline() {
     return toResults(await live.predict(features, fShape.value));
   }
 
+  /**
+   * Clears every trained artifact and resets the live model and the training
+   * store. Called whenever the dataset changes out from under the model (a new
+   * project, an imported project, or a modality switch) so a model trained on
+   * one dataset can never be tested or downloaded against another. Disposes the
+   * model, its optimizer, and the retained tensors.
+   */
+  function reset(): void {
+    // Never tear down artifacts mid-run; callers guard on busy too, this is the
+    // backstop so an in-flight fit or export keeps its tensors and model.
+    if (busy.value) return;
+    disposeTensors();
+    disposeModel(trainedModel.value);
+    trainedModel.value = null;
+    bytes.value = null;
+    classOrder.value = [];
+    classNames.value = [];
+    featureCfg.value = null;
+    fShape.value = [];
+    hasModel.value = false;
+    live.reset();
+    training.$reset();
+  }
+
   /** The op resolver calls and input shape a sketch export needs. */
   function exportOps(): { resolverCalls: string[]; inputShape: number[] } {
     const layers = trainedModel.value?.layers ?? [];
@@ -327,13 +373,18 @@ export function usePipeline() {
     trainedModel,
     bytes,
     classNames,
+    featureCfg,
+    fShape,
     hasModel,
+    busy,
     canTrain,
+    usableCounts,
     previewSummary,
     inspectLayers,
     train,
     cancel: trainer.cancel,
     exportModel,
+    reset,
     predictImage,
     predictAudio,
     predictMotion,

@@ -123,7 +123,7 @@ try {
       await page.waitForTimeout(50);
     }
     for (let c = 0; c < CLASSES.length; c++) {
-      await page.locator('.classbtn', { hasText: CLASSES[c] }).first().click();
+      await page.locator('.selbtn', { hasText: CLASSES[c] }).first().click();
       for (const session of [0, 1]) {
         await page.setInputFiles('input[data-test="import-file"]', batch(c, session, 7));
         await page.waitForTimeout(120);
@@ -158,7 +158,7 @@ try {
     // closes, so the import below uses an in memory buffer, not the path.
     const savedBuffer = savedPath ? readFileSync(savedPath) : Buffer.alloc(0);
     const savedName = download.suggestedFilename();
-    check('exports a project file', /\.viseproj\.json$/.test(savedName) && savedBuffer.length > 0, `${savedBuffer.length} bytes`);
+    check('exports a project file', /\.tfwsproj\.json$/.test(savedName) && savedBuffer.length > 0, `${savedBuffer.length} bytes`);
     await ctx.close();
 
     // ---- Import the saved project into a fresh context ----

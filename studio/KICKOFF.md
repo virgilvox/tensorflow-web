@@ -1,6 +1,6 @@
-# VISE Studio continuation kickoff
+# TF Web Studio continuation kickoff
 
-VISE Studio is already built: all five phases in `studio/PLAN.md` are complete,
+TF Web Studio is already built: all five phases in `studio/PLAN.md` are complete,
 verified, and committed, then audited and hardened. This file is the paste-ready
 prompt to continue the work in a fresh session. The full state is in
 [`HANDOFF.md`](./HANDOFF.md).
@@ -10,7 +10,7 @@ contained and assumes no prior conversation.
 
 ---
 
-You are continuing VISE Studio, a browser native, local first machine learning
+You are continuing TF Web Studio, a browser native, local first machine learning
 training studio in this repository
 (`/Users/obsidian/Projects/ossuary-projects/tensorflow-web`). It is already built
 end to end and is in good shape; you are extending and maintaining it, not

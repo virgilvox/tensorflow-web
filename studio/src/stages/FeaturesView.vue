@@ -6,9 +6,9 @@
  * preview of the processed result lands with each modality's phase.
  */
 import { computed } from 'vue';
-import ViseSectionHead from '../design/components/ViseSectionHead.vue';
-import ViseCard from '../design/components/ViseCard.vue';
-import ViseBadge from '../design/components/ViseBadge.vue';
+import TwSectionHead from '../design/components/TwSectionHead.vue';
+import TwCard from '../design/components/TwCard.vue';
+import TwBadge from '../design/components/TwBadge.vue';
 import { useProjectStore } from '../stores/project';
 import { useSettingsStore } from '../stores/settings';
 import { MODALITIES } from '../lib/modalities';
@@ -20,27 +20,27 @@ const info = computed(() => MODALITIES[project.modality]);
 
 <template>
   <section>
-    <ViseSectionHead index="02" title="Features" :note="`auto chosen for ${info.label.toLowerCase()}`" />
+    <TwSectionHead index="02" title="Features" :note="`auto chosen for ${info.label.toLowerCase()}`" />
 
-    <ViseCard accent>
+    <TwCard accent>
       <template #header>
         <span class="ct">Pipeline</span>
-        <ViseBadge variant="auto">auto</ViseBadge>
-        <ViseBadge variant="why" :title="info.featureReason">why</ViseBadge>
+        <TwBadge variant="auto">auto</TwBadge>
+        <TwBadge variant="why" :title="info.featureReason">why</TwBadge>
       </template>
       <p class="line">{{ info.feature }}</p>
       <p class="reason">{{ info.featureReason }}</p>
-    </ViseCard>
+    </TwCard>
 
-    <ViseCard v-if="settings.editable" title="Main knobs" meta="standard" class="mt">
+    <TwCard v-if="settings.editable" title="Main knobs" meta="standard" class="mt">
       Image size, channels, and normalization become editable here. The live preview shows the
       processed tensor as you change them.
-    </ViseCard>
+    </TwCard>
 
-    <ViseCard v-if="settings.expert" title="Full pipeline" meta="expert" accent class="mt">
+    <TwCard v-if="settings.expert" title="Full pipeline" meta="expert" accent class="mt">
       Augmentation, the spectrogram parameters, MFCC versus mel, windowing, and the vocabulary cap
       open at the Expert altitude, each with the same live preview.
-    </ViseCard>
+    </TwCard>
 
     <p v-if="!settings.showsConfigStages" class="guided">
       In Guided the feature pipeline is automatic and stays out of your way. Raise the altitude to

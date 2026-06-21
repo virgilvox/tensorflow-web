@@ -1,24 +1,27 @@
 <script setup lang="ts">
 /**
- * The fixed top bar. Carries the VISE mark, the altitude control that drives
+ * The fixed top bar. Carries the TF Web Studio mark, the altitude control that drives
  * progressive disclosure across every stage, the active project name, the target
  * device selector the budget meter checks against, and the loud local only
  * indicator stating that nothing leaves the browser.
  */
-import { computed, useTemplateRef } from 'vue';
-import ViseSegmented from './ViseSegmented.vue';
-import ViseIcon from './ViseIcon.vue';
+import { computed, ref, useTemplateRef } from 'vue';
+import TwSegmented from './TwSegmented.vue';
+import TwIcon from './TwIcon.vue';
 import { useSettingsStore, TARGET_DEVICES } from '../../stores/settings';
 import { useProjectStore } from '../../stores/project';
 import { useProjectFile } from '../../composables/useProjectFile';
 import { useDataset } from '../../composables/useDataset';
+import { usePipeline } from '../../composables/usePipeline';
 import type { AltitudeLevel, TargetDeviceId } from '../../types';
 
 const settings = useSettingsStore();
 const project = useProjectStore();
 const projectFile = useProjectFile();
 const dataset = useDataset();
+const pipeline = usePipeline();
 const importInput = useTemplateRef<HTMLInputElement>('importInput');
+const importError = ref<string | null>(null);
 
 async function onRename(event: Event): Promise<void> {
   project.name = (event.target as HTMLInputElement).value || 'untitled';
@@ -28,14 +31,33 @@ async function onRename(event: Event): Promise<void> {
 async function onImport(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
-  if (file) await projectFile.importFromFile(file);
   input.value = '';
+  if (!file) return;
+  if (pipeline.busy.value) {
+    importError.value = 'Finish the current training or export before importing.';
+    return;
+  }
+  importError.value = null;
+  try {
+    await projectFile.importFromFile(file);
+    // The imported dataset replaces the old one, so any model trained on the
+    // previous project must not survive to be tested or downloaded.
+    pipeline.reset();
+  } catch (err) {
+    importError.value = err instanceof Error ? err.message : 'Could not read that project file.';
+  }
 }
 
 async function onNew(): Promise<void> {
   if (project.totalSamples === 0 && project.classes.length === 0) return;
+  if (pipeline.busy.value) {
+    importError.value = 'Finish the current training or export before starting a new project.';
+    return;
+  }
   if (!window.confirm('Start a new project? This clears the current classes and samples.')) return;
   await dataset.clearAll();
+  // Drop the trained model along with the data it was trained on.
+  pipeline.reset();
 }
 
 const ALTITUDES: ReadonlyArray<{ value: AltitudeLevel; label: string }> = [
@@ -58,13 +80,13 @@ function onTargetChange(event: Event): void {
   <header class="topbar">
     <div class="mark">
       <span class="jawmark" aria-hidden="true"><i></i><i></i></span>
-      <span class="word">VISE</span>
+      <span class="word">TF Web</span>
       <span class="sub">Studio</span>
     </div>
 
     <div class="altitude">
       <span class="lab cap">Altitude</span>
-      <ViseSegmented v-model="altitude" :options="ALTITUDES" aria-label="Altitude level" />
+      <TwSegmented v-model="altitude" :options="ALTITUDES" aria-label="Altitude level" />
     </div>
 
     <div class="right">
@@ -79,16 +101,17 @@ function onTargetChange(event: Event): void {
             @change="onRename"
           />
           <button class="picon" type="button" aria-label="New project" title="New project (clears everything)" @click="onNew">
-            <ViseIcon name="plus" :size="14" />
+            <TwIcon name="plus" :size="14" />
           </button>
           <button class="picon" type="button" aria-label="Export project to a file" title="Export project" @click="projectFile.exportToFile()">
-            <ViseIcon name="save" :size="14" />
+            <TwIcon name="save" :size="14" />
           </button>
           <button class="picon" type="button" aria-label="Import project from a file" title="Import project" @click="importInput?.click()">
-            <ViseIcon name="open" :size="14" />
+            <TwIcon name="open" :size="14" />
           </button>
           <input ref="importInput" type="file" accept=".json,application/json" class="hidden" data-test="import-project" @change="onImport" />
         </div>
+        <span v-if="importError" class="imperr" data-test="import-error" role="alert">{{ importError }}</span>
       </div>
 
       <label class="device">
@@ -99,7 +122,7 @@ function onTargetChange(event: Event): void {
       </label>
 
       <span class="local" title="All data stays in this browser. Nothing is uploaded.">
-        <ViseIcon name="lock" :size="13" />
+        <TwIcon name="lock" :size="13" />
         Local only
       </span>
     </div>
@@ -210,6 +233,15 @@ function onTargetChange(event: Event): void {
 }
 .hidden {
   display: none;
+}
+.imperr {
+  display: block;
+  margin-top: 3px;
+  max-width: 28ch;
+  font-family: var(--f-label);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--rust);
 }
 .device select {
   background: var(--gunmetal);

@@ -165,9 +165,9 @@ npm run app         # run the test app at http://localhost:5173
 
 Adding support for a new layer is a small, isolated change: write a converter under `src/ops/`, register it, and add a parity case. See [`DESIGN.md`](./DESIGN.md) for the architecture and the weight layout rules.
 
-## VISE Studio
+## TF Web Studio
 
-[`studio/`](./studio/README.md) holds VISE Studio, a browser native, local first application built on this library: collect data, train a small model, test it live, and export a verified int8 `.tflite` for image, audio, motion, and text. It is a separate package with its own dependencies, imports the library source through a Vite alias, and is never published with the library. See its [README](./studio/README.md) to run it.
+[`studio/`](./studio/README.md) holds TF Web Studio, a browser native, local first application built on this library: collect data, train a small model, test it live, and export a verified int8 `.tflite` for image, audio, motion, and text. A standalone Playground runs the trained model, an exported bundle, or an uploaded `.tflite` live against fresh camera, microphone, motion, or text input. It is a separate package with its own dependencies, imports the library source through a Vite alias, and is never published with the library. See its [README](./studio/README.md) to run it.
 
 ## License
 

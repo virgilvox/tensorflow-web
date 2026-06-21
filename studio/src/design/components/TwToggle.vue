@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseToggle is a labelled on/off switch.
+ * TwToggle is a labelled on/off switch.
  * The track fills with the caution-dim tone and the knob slides right and
  * turns live when the value is on. Renders as a button with switch semantics
  * so assistive technology reports the checked state.

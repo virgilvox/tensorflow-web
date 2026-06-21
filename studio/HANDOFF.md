@@ -1,4 +1,4 @@
-# VISE Studio handoff
+# TF Web Studio handoff
 
 State of the work for whoever picks it up next, human or agent. The paste-ready
 prompt for a fresh session is in [`KICKOFF.md`](./KICKOFF.md); this file is the
@@ -6,7 +6,7 @@ reference it points at.
 
 ## What this is
 
-VISE Studio is a browser native, local first studio that collects data, trains a
+TF Web Studio is a browser native, local first studio that collects data, trains a
 small model, tests it live, and exports a verified int8 `.tflite` plus a C array
 and a TFLite Micro sketch. It is built on the headless `tensorflow-web` library
 in this same repository and is a separate package in `studio/` that is never
@@ -18,6 +18,36 @@ All five build phases in `PLAN.md` section 16 are done, verified, and committed.
 Four modalities (image, audio, motion, text) run the full loop end to end:
 collect, optional features and model, train, test live, export a parity verified
 int8 `.tflite`. The Guided, Standard, Expert altitude control drives disclosure.
+
+Added after the original five phases (audit driven and on request):
+- A standalone Playground (`/playground`, `PlaygroundView.vue`, `usePlayground.ts`)
+  that runs a model live on fresh input independent of the project, loading the
+  current session model, a self-contained bundle (`.tfwsmodel.json`,
+  `lib/modelBundle.ts`), or a bare `.tflite` configured by hand. It holds its own
+  interpreter instance, separate from the Test stage's shared live inference. It
+  listens continuously on a rolling window (audio) and predicts every frame
+  (image), driven by `useMicrophone.latestWindow` and a guarded poll loop, rather
+  than capturing one clip per click. A bare `.tflite` whose preprocessing cannot
+  be made to match the interpreter's reported input shape is refused with a clear
+  message instead of failing at predict.
+- A Data stage readiness cue: per class sample progress and a Train action that
+  enables when the dataset clears the bar.
+- Selectable (and arbitrary) microphone clip length. The audio extractor anchors
+  every clip to a fixed `clipSeconds` (carried in `AudioFeatureConfig` and the
+  bundle): each clip is padded or truncated to that length and the hop is derived
+  from it, so the same sound always maps to the same grid and training and live
+  inference stay consistent. A longer configured clip spans more time across the
+  same fixed-size grid, so a longer recording is used, not truncated.
+- An in-flight guard (`usePipeline.busy`): train and export refuse to overlap, and
+  New project / Import / modality switch are blocked while a job runs, so reset()
+  can never free tensors out from under a running fit or export.
+- Export now also emits the Playground bundle alongside the `.tflite`, C array,
+  and sketch.
+- Fixes from the audit: a model trained on one dataset no longer survives a New
+  project, Import, or modality switch (a `usePipeline.reset()` disposes it and
+  resets the training store); import failure now surfaces an inline error instead
+  of failing silently; the class row delete is a real button and the modality and
+  class controls carry `aria-pressed`.
 
 Commit history (newest first):
 
@@ -38,17 +68,18 @@ green, and only with the maintainer's go ahead.
 ```
 npm install
 npm run typecheck                # vue-tsc, expect 0 errors
-npm run test                     # Vitest unit tests, expect 52 passing
+npm run test                     # Vitest unit tests, expect 59 passing
 node scripts/smoke.mjs           # shell smoke (10 checks)
 node scripts/smoke-image.mjs     # image flow end to end (7)
 node scripts/smoke-audio.mjs     # audio keyword spotting (6)
 node scripts/smoke-mt.mjs        # motion and text (10)
 node scripts/smoke-expert.mjs    # expert depth + project save/load (5)
 node scripts/smoke-persist.mjs   # reload persistence regression (4)
+node scripts/smoke-playground.mjs # playground: current model + reloaded bundle (6)
 npm run dev                      # http://localhost:5173 (or next free port)
 ```
 
-Last known good: typecheck 0, 52 unit tests, and all six smokes green. The smokes
+Last known good: typecheck 0, 59 unit tests, and all seven smokes green. The smokes
 use the system Chrome through Playwright (`channel: 'chrome', headless: true`),
 start their own Vite server, and inject learnable data through the real file or
 text import UI, since a headless browser has no camera, microphone, or motion
@@ -65,17 +96,17 @@ studio/
   vite.config.ts             alias tensorflow-web -> ../src/index.ts, tfjs dedupe
   src/
     main.ts App.vue router.ts
-    design/ tokens.css base.css components/Vise*.vue   (18 components)
-    stages/ Data Features Model Train Test Export views
+    design/ tokens.css base.css components/Tw*.vue   (18 components)
+    stages/ Data Features Model Train Test Export Playground views
     stores/ project.ts training.ts settings.ts          (Pinia)
     composables/  the only place that touches the library and browser devices:
       useCamera useMicrophone useMotion useDataset useInterpreter useTrainer
       useQuantizer useVerifier useDeviceBudget useLiveInference useExport
-      useProjectFile usePipeline (the orchestrator)
+      useProjectFile usePlayground usePipeline (the orchestrator)
     features/  pure extractors: image/ audio/ motion/ text/ + index.ts dispatch
     models/    builder.ts presets.ts types.ts
     lib/       dsp tensors storage split cformat format modalities imageDecode
-               audioDecode motionImport projectFile
+               audioDecode motionImport projectFile modelBundle
     types.ts
   test/        Vitest unit tests for the pure pieces
   scripts/     headless smokes (one per modality plus shell and persistence)
@@ -117,6 +148,20 @@ These were each a bug or a near miss. Keep them true.
    fails loud with its name.
 9. A smoke must reload the page after capture to catch persistence regressions
    (this is what `smoke-persist.mjs` exists for).
+10. A trained model must never outlive the dataset it was trained on. New project,
+   Import, and modality switch all call `usePipeline.reset()`, which disposes the
+   model and resets the training store, so a stale model can never be tested or
+   downloaded against a different dataset. The Playground's `usePlayground` holds
+   its OWN interpreter instance; loading a model there must not touch the Test
+   stage's shared live inference.
+11. One job at a time. `usePipeline.busy` gates train and export against each other
+   and gates reset() (New project, Import, modality switch) against a running job,
+   so the shared module-level tensors and model are never freed mid-fit or
+   mid-export. Keep these guards when adding any action that mutates pipeline state.
+12. Audio extraction is anchored to a fixed `clipSeconds`, not the recorded clip
+   length. Keep the pad/truncate-to-clipSeconds step so the same sound maps to the
+   same grid; deriving the hop from a single clip's length silently warps the time
+   axis and breaks train/live parity.
 
 ## Hard boundary with the library
 
@@ -134,7 +179,13 @@ reverted).
 - A full editable layer editor. Today the Expert path shows a read only operator
   inspector; the plan flags the editor as a stretch.
 - Replace the native `window.confirm` prompts (modality switch, New project) with
-  styled in app modals.
+  styled in app modals. Still the one native UI; everything else is in app.
+- Bare `.tflite` support in the Playground is pragmatic: the user picks the
+  modality, preprocessing, and labels (image preprocessing is prefilled from the
+  interpreter's reported input shape when available). Audio and motion fall back
+  to the default feature config, so a foreign model whose preprocessing differs
+  will misread; a studio bundle avoids this. Text needs a bundle for its
+  vocabulary. Deriving more of the config from a bare model is a future step.
 - Real device validation. The webcam, microphone, and DeviceMotion capture paths
   are wired and typecheck, but only the file and text import paths are exercised
   by the headless smokes. Test capture on real hardware.
@@ -153,7 +204,7 @@ reverted).
 ## Decisions already made (do not relitigate)
 
 - Stage labels are plain words: Data, Features, Model, Train, Test, Export. The
-  VISE machine shop character is visual only.
+  machine shop character is visual only.
 - Image, audio, and motion lead; text is bag of words, included with its limits
   stated.
 - Transfer learning is out of scope; if added, flag that it will not fit an MCU.

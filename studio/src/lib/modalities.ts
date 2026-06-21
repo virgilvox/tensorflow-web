@@ -9,7 +9,7 @@ import type { Modality } from '../types';
 export interface ModalityInfo {
   id: Modality;
   label: string;
-  /** ViseIcon name. */
+  /** TwIcon name. */
   icon: string;
   /** How samples are captured, shown in the Data stage. */
   capture: string;

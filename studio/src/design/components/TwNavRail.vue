@@ -6,7 +6,7 @@
  * drives progressive disclosure of the rail itself.
  */
 import { computed } from 'vue';
-import ViseIcon from './ViseIcon.vue';
+import TwIcon from './TwIcon.vue';
 import { STAGES } from '../../router';
 import { useSettingsStore } from '../../stores/settings';
 
@@ -20,22 +20,37 @@ const visibleStages = computed(() =>
 </script>
 
 <template>
-  <nav class="rail" aria-label="Workflow stages">
-    <RouterLink
-      v-for="(stage, i) in visibleStages"
-      :key="stage.id"
-      :to="`/${stage.id}`"
-      class="ri"
-      active-class="on"
-    >
-      <span class="n mono-num">{{ String(i + 1).padStart(2, '0') }}</span>
-      <span class="ic"><ViseIcon :name="stage.id" :size="18" /></span>
-      <span class="txt">
-        <span class="lbl">{{ stage.label }}</span>
-        <span class="cap">{{ stage.caption }}</span>
-      </span>
-    </RouterLink>
-  </nav>
+  <div class="rail">
+    <nav aria-label="Workflow stages">
+      <RouterLink
+        v-for="(stage, i) in visibleStages"
+        :key="stage.id"
+        :to="`/${stage.id}`"
+        class="ri"
+        active-class="on"
+      >
+        <span class="n mono-num">{{ String(i + 1).padStart(2, '0') }}</span>
+        <span class="ic"><TwIcon :name="stage.id" :size="18" /></span>
+        <span class="txt">
+          <span class="lbl">{{ stage.label }}</span>
+          <span class="cap">{{ stage.caption }}</span>
+        </span>
+      </RouterLink>
+    </nav>
+
+    <span class="sep" aria-hidden="true"></span>
+
+    <nav aria-label="Tools">
+      <RouterLink to="/playground" class="ri" active-class="on">
+        <span class="n mono-num">&middot;</span>
+        <span class="ic"><TwIcon name="play" :size="18" /></span>
+        <span class="txt">
+          <span class="lbl">Playground</span>
+          <span class="cap">run any model</span>
+        </span>
+      </RouterLink>
+    </nav>
+  </div>
 </template>
 
 <style scoped>
@@ -67,6 +82,11 @@ const visibleStages = computed(() =>
   border-left-color: var(--live);
   color: var(--live);
   background: var(--iron);
+}
+.sep {
+  height: 1px;
+  background: var(--seam);
+  margin: var(--s-3) 14px;
 }
 .n {
   font-family: var(--f-display);

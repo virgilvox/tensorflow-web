@@ -5,7 +5,7 @@
  * clone IndexedDB uses, so samples are stored as is. No Vue, no library.
  */
 
-const DB_NAME = 'vise-studio';
+const DB_NAME = 'tf-web-studio';
 const DB_VERSION = 1;
 
 /** The object stores the studio keeps: one for samples, one for project meta. */

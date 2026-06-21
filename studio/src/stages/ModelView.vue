@@ -8,9 +8,9 @@
  */
 import { computed, ref, watchEffect } from 'vue';
 import { supportedLayers } from 'tensorflow-web';
-import ViseSectionHead from '../design/components/ViseSectionHead.vue';
-import ViseCard from '../design/components/ViseCard.vue';
-import ViseBadge from '../design/components/ViseBadge.vue';
+import TwSectionHead from '../design/components/TwSectionHead.vue';
+import TwCard from '../design/components/TwCard.vue';
+import TwBadge from '../design/components/TwBadge.vue';
 import { useProjectStore } from '../stores/project';
 import { useSettingsStore } from '../stores/settings';
 import { usePipeline } from '../composables/usePipeline';
@@ -48,13 +48,13 @@ watchEffect(() => {
 
 <template>
   <section>
-    <ViseSectionHead index="03" title="Model" :note="`auto sized for ${info.label.toLowerCase()}`" />
+    <TwSectionHead index="03" title="Model" :note="`auto sized for ${info.label.toLowerCase()}`" />
 
-    <ViseCard accent>
+    <TwCard accent>
       <template #header>
         <span class="ct">Architecture</span>
-        <ViseBadge variant="auto">auto</ViseBadge>
-        <ViseBadge variant="why" :title="info.modelReason">why</ViseBadge>
+        <TwBadge variant="auto">auto</TwBadge>
+        <TwBadge variant="why" :title="info.modelReason">why</TwBadge>
       </template>
       <p class="line">{{ info.model }}</p>
       <p class="reason">{{ info.modelReason }}</p>
@@ -63,19 +63,19 @@ watchEffect(() => {
         <span class="stat"><span class="lab">int8 weights</span><span class="sv mono-num">{{ formatBytes(summary.estimatedWeightBytes) }}</span></span>
         <span class="stat"><span class="lab">layers</span><span class="sv mono-num">{{ summary.layerCount }}</span></span>
       </div>
-    </ViseCard>
+    </TwCard>
 
-    <ViseCard title="Exportable layers" meta="library constraint" class="mt">
+    <TwCard title="Exportable layers" meta="library constraint" class="mt">
       <p class="reason">
         The library trains from scratch and exports int8. Only these layers serialize to a .tflite;
         anything else trains fine and then fails loud on export with its name.
       </p>
       <div class="chips">
-        <ViseBadge v-for="l in layers" :key="l" variant="default">{{ l }}</ViseBadge>
+        <TwBadge v-for="l in layers" :key="l" variant="default">{{ l }}</TwBadge>
       </div>
-    </ViseCard>
+    </TwCard>
 
-    <ViseCard v-if="settings.expert && opLayers.length" title="Operator inspector" meta="expert" accent class="mt">
+    <TwCard v-if="settings.expert && opLayers.length" title="Operator inspector" meta="expert" accent class="mt">
       <table class="ops">
         <thead>
           <tr><th>#</th><th>operator</th><th>output shape</th><th>params</th></tr>
@@ -94,7 +94,7 @@ watchEffect(() => {
         your data and target; a full layer editor that builds only from these operators is the
         deferred Expert stretch.
       </p>
-    </ViseCard>
+    </TwCard>
 
     <p v-if="!settings.showsConfigStages" class="guided">
       In Guided the architecture is chosen for you and sized to your data and target. Raise the

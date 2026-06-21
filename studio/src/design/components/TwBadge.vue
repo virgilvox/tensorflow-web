@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseBadge renders a compact metadata badge for marking up model and dataset
+ * TwBadge renders a compact metadata badge for marking up model and dataset
  * details. It carries no logic of its own, the visual treatment is selected by
  * the variant prop and the label text comes from the default slot.
  */

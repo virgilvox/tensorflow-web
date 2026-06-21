@@ -7,16 +7,23 @@
  * and test. Capture for the other modalities lands with their phases.
  */
 import { ref, computed, onMounted, useTemplateRef } from 'vue';
-import ViseSectionHead from '../design/components/ViseSectionHead.vue';
-import ViseCard from '../design/components/ViseCard.vue';
-import ViseButton from '../design/components/ViseButton.vue';
-import ViseBadge from '../design/components/ViseBadge.vue';
-import ViseField from '../design/components/ViseField.vue';
-import ViseIcon from '../design/components/ViseIcon.vue';
-import ViseStatus from '../design/components/ViseStatus.vue';
+import { useRouter } from 'vue-router';
+import TwSectionHead from '../design/components/TwSectionHead.vue';
+import TwCard from '../design/components/TwCard.vue';
+import TwButton from '../design/components/TwButton.vue';
+import TwBadge from '../design/components/TwBadge.vue';
+import TwField from '../design/components/TwField.vue';
+import TwIcon from '../design/components/TwIcon.vue';
+import TwStatus from '../design/components/TwStatus.vue';
 import { useProjectStore } from '../stores/project';
-import { useSettingsStore } from '../stores/settings';
+import {
+  useSettingsStore,
+  AUDIO_SECONDS_PRESETS,
+  AUDIO_SECONDS_MIN,
+  AUDIO_SECONDS_MAX,
+} from '../stores/settings';
 import { useDataset } from '../composables/useDataset';
+import { usePipeline, MIN_PER_CLASS } from '../composables/usePipeline';
 import { useCamera, CAPTURE_SIZE } from '../composables/useCamera';
 import { useMicrophone } from '../composables/useMicrophone';
 import { useMotion } from '../composables/useMotion';
@@ -29,6 +36,8 @@ import type { Modality } from '../types';
 const project = useProjectStore();
 const settings = useSettingsStore();
 const dataset = useDataset();
+const pipeline = usePipeline();
+const router = useRouter();
 const camera = useCamera();
 const mic = useMicrophone();
 const motion = useMotion();
@@ -62,6 +71,8 @@ function newSessionId(): string {
 
 async function pickModality(m: Modality): Promise<void> {
   if (m === project.modality) return;
+  // Do not switch (and clear) while a model is training or exporting.
+  if (pipeline.busy.value) return;
   // A project is single modality: its samples and classes belong to one. Switching
   // with data present clears it, after confirmation, so no sample is ever left
   // attached to the wrong modality.
@@ -71,6 +82,8 @@ async function pickModality(m: Modality): Promise<void> {
     );
     if (!ok) return;
     await dataset.clearAll();
+    // A model trained on the old modality must not survive the switch.
+    pipeline.reset();
     activeClassId.value = null;
   }
   project.setModality(m);
@@ -130,11 +143,25 @@ async function recordClip(): Promise<void> {
   if (!activeClassId.value || !micSession.value || recording.value) return;
   recording.value = true;
   try {
-    const clip = await mic.record();
+    const clip = await mic.record(settings.audioSeconds);
     await dataset.addAudioSample(activeClassId.value, micSession.value, clip);
   } finally {
     recording.value = false;
   }
+}
+
+/** Formats the clip length for a button label, trimming a trailing .0. */
+const clipLabel = computed<string>(() => {
+  const s = settings.audioSeconds;
+  return Number.isInteger(s) ? `${s}s` : `${s.toFixed(1)}s`;
+});
+
+function onCustomSeconds(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  settings.setAudioSeconds(Number(input.value));
+  // Reflect clamping or rejection of a bad value back into the field, so the
+  // input never disagrees with the stored clip length.
+  input.value = String(settings.audioSeconds);
 }
 
 async function onAudioFiles(event: Event): Promise<void> {
@@ -204,11 +231,35 @@ async function removeClass(id: string): Promise<void> {
 const activeClassName = computed(
   () => project.classes.find((c) => c.id === activeClassId.value)?.name ?? null,
 );
+
+// Train readiness, surfaced on the Data stage so it is obvious when enough has
+// been collected. A class is ready at MIN_PER_CLASS samples; training needs at
+// least two classes, each clearing that bar.
+const classProgress = computed(() => {
+  // Count only samples that can actually train this modality's model, the same
+  // basis canTrain() uses, so the cue never says "ready" while Train is disabled.
+  const usable = pipeline.usableCounts();
+  return project.classes.map((c) => {
+    const count = usable[c.id] ?? 0;
+    return { id: c.id, name: c.name, count, enough: count >= MIN_PER_CLASS };
+  });
+});
+const ready = computed(() => pipeline.canTrain());
+const readyMessage = computed<string>(() => {
+  if (project.classes.length < 2) return 'Add at least two classes, then collect samples for each.';
+  const short = classProgress.value.filter((c) => !c.enough);
+  if (short.length === 0) return `Every class has at least ${MIN_PER_CLASS} samples. You can train.`;
+  return `${short.map((c) => `${c.name} needs ${MIN_PER_CLASS - c.count} more`).join(', ')}.`;
+});
+
+function goToTrain(): void {
+  router.push('/train');
+}
 </script>
 
 <template>
   <section>
-    <ViseSectionHead index="01" title="Data" note="collect and label, nothing leaves the browser" />
+    <TwSectionHead index="01" title="Data" note="collect and label, nothing leaves the browser" />
 
     <p class="subhead">Modality</p>
     <div class="modgrid">
@@ -218,9 +269,10 @@ const activeClassName = computed(
         type="button"
         class="modcard"
         :class="{ on: project.modality === m }"
+        :aria-pressed="project.modality === m"
         @click="pickModality(m)"
       >
-        <ViseIcon :name="MODALITIES[m].icon" :size="22" />
+        <TwIcon :name="MODALITIES[m].icon" :size="22" />
         <span class="ml">{{ MODALITIES[m].label }}</span>
         <span class="mc">{{ MODALITIES[m].capture }}</span>
       </button>
@@ -231,15 +283,15 @@ const activeClassName = computed(
         <p class="subhead">Classes</p>
 
         <div class="addrow">
-          <ViseField
+          <TwField
             v-model="newClassName"
             label="New class name"
             placeholder="e.g. thumbs up"
             @keyup.enter="addClass"
           />
-          <ViseButton size="sm" :disabled="!newClassName.trim()" @click="addClass">
-            <ViseIcon name="plus" :size="13" /> Add class
-          </ViseButton>
+          <TwButton size="sm" :disabled="!newClassName.trim()" @click="addClass">
+            <TwIcon name="plus" :size="13" /> Add class
+          </TwButton>
         </div>
 
         <div v-if="!project.negativeClass" class="scaffold">
@@ -247,58 +299,83 @@ const activeClassName = computed(
             A {{ info.negative }} class catches everything that is none of your classes. It is a
             first class step, not an afterthought.
           </span>
-          <ViseButton size="sm" variant="ghost" @click="ensureNegative">
+          <TwButton size="sm" variant="ghost" @click="ensureNegative">
             Add {{ info.negative }}
-          </ViseButton>
+          </TwButton>
         </div>
 
         <ul v-if="project.classes.length" class="classlist">
           <li v-for="c in project.classes" :key="c.id">
-            <button
-              type="button"
-              class="classbtn"
-              :class="{ active: c.id === activeClassId }"
-              @click="activeClassId = c.id"
-            >
-              <ViseCard :accent="c.id === activeClassId">
-                <div class="classrow">
+            <TwCard :accent="c.id === activeClassId">
+              <div class="classrow">
+                <button
+                  type="button"
+                  class="selbtn"
+                  :class="{ active: c.id === activeClassId }"
+                  :aria-pressed="c.id === activeClassId"
+                  @click="activeClassId = c.id"
+                >
                   <span class="cname">
                     {{ c.name }}
-                    <ViseBadge v-if="c.negative" variant="auto">negative</ViseBadge>
-                    <ViseBadge v-if="c.id === activeClassId" variant="ver-cur">capturing</ViseBadge>
+                    <TwBadge v-if="c.negative" variant="auto">negative</TwBadge>
+                    <TwBadge v-if="c.id === activeClassId" variant="ver-cur">capturing</TwBadge>
                   </span>
-                  <span class="ccount mono-num">{{ project.countsByClass[c.id] ?? 0 }} samples</span>
-                  <span class="del" role="button" :aria-label="`Remove ${c.name}`" @click.stop="removeClass(c.id)">
-                    <ViseIcon name="trash" :size="14" />
-                  </span>
-                </div>
-              </ViseCard>
-            </button>
+                </button>
+                <span class="ccount mono-num">{{ project.countsByClass[c.id] ?? 0 }} samples</span>
+                <button
+                  type="button"
+                  class="del"
+                  :aria-label="`Remove ${c.name}`"
+                  @click="removeClass(c.id)"
+                >
+                  <TwIcon name="trash" :size="14" />
+                </button>
+              </div>
+            </TwCard>
           </li>
         </ul>
         <p v-else class="empty">No classes yet. Name your first class above.</p>
+
+        <div v-if="project.classes.length" class="ready" :class="{ go: ready }">
+          <div class="rhead">
+            <TwStatus :state="ready ? 'pass' : 'hold'">
+              {{ ready ? 'Ready to train' : 'Keep collecting' }}
+            </TwStatus>
+            <TwButton size="sm" :disabled="!ready" data-test="go-train" @click="goToTrain">
+              <TwIcon name="train" :size="13" /> Train
+            </TwButton>
+          </div>
+          <p class="rmsg">{{ readyMessage }}</p>
+          <ul class="rprog">
+            <li v-for="c in classProgress" :key="c.id" :class="{ done: c.enough }">
+              <span class="rdot"><TwIcon v-if="c.enough" name="check" :size="11" /></span>
+              <span class="rpn">{{ c.name }}</span>
+              <span class="rpc mono-num">{{ Math.min(c.count, MIN_PER_CLASS) }}/{{ MIN_PER_CLASS }}</span>
+            </li>
+          </ul>
+        </div>
 
         <template v-if="project.modality === 'image'">
           <p class="subhead capture-head">
             Capture
             <span v-if="activeClassName" class="into">into {{ activeClassName }}</span>
           </p>
-          <ViseCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
+          <TwCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
             Select a class above, then capture from the webcam or import image files into it.
-          </ViseCard>
+          </TwCard>
           <div v-else class="capture">
             <div class="cam">
               <video ref="video" class="preview" playsinline muted></video>
               <div class="camrow">
-                <ViseButton v-if="!camera.active.value" size="sm" @click="startCamera">
-                  <ViseIcon name="camera" :size="13" /> Start camera
-                </ViseButton>
+                <TwButton v-if="!camera.active.value" size="sm" @click="startCamera">
+                  <TwIcon name="camera" :size="13" /> Start camera
+                </TwButton>
                 <template v-else>
-                  <ViseButton size="sm" @click="captureFrame">
-                    <ViseIcon name="plus" :size="13" /> Capture
-                  </ViseButton>
-                  <ViseButton size="sm" variant="ghost" @click="camera.stop()">Stop</ViseButton>
-                  <ViseStatus state="run">live</ViseStatus>
+                  <TwButton size="sm" @click="captureFrame">
+                    <TwIcon name="plus" :size="13" /> Capture
+                  </TwButton>
+                  <TwButton size="sm" variant="ghost" @click="camera.stop()">Stop</TwButton>
+                  <TwStatus state="run">live</TwStatus>
                 </template>
               </div>
               <p v-if="camera.error.value" class="camerr">{{ camera.error.value }}</p>
@@ -314,9 +391,9 @@ const activeClassName = computed(
                 data-test="import-file"
                 @change="onFiles"
               />
-              <ViseButton variant="ghost" size="sm" :disabled="importing" @click="fileInput?.click()">
-                <ViseIcon name="image" :size="13" /> {{ importing ? 'Importing...' : 'Import images' }}
-              </ViseButton>
+              <TwButton variant="ghost" size="sm" :disabled="importing" @click="fileInput?.click()">
+                <TwIcon name="image" :size="13" /> {{ importing ? 'Importing...' : 'Import images' }}
+              </TwButton>
               <p class="hint">Each import batch is one capture session.</p>
             </div>
           </div>
@@ -326,22 +403,49 @@ const activeClassName = computed(
             Capture
             <span v-if="activeClassName" class="into">into {{ activeClassName }}</span>
           </p>
-          <ViseCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
-            Select a class above, then record one second clips from the microphone or import audio
+          <TwCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
+            Select a class above, then record clips from the microphone or import audio
             files into it. Add a Background Noise class so the model has a rest state.
-          </ViseCard>
+          </TwCard>
           <div v-else class="capture">
             <div class="cam">
+              <div class="cliplen">
+                <span class="clab">Clip length</span>
+                <div class="cliprow">
+                  <button
+                    v-for="p in AUDIO_SECONDS_PRESETS"
+                    :key="p"
+                    type="button"
+                    class="chip"
+                    :class="{ on: settings.audioSeconds === p }"
+                    :aria-pressed="settings.audioSeconds === p"
+                    @click="settings.setAudioSeconds(p)"
+                  >
+                    {{ p }}s
+                  </button>
+                  <input
+                    class="clipnum mono-num"
+                    type="number"
+                    :min="AUDIO_SECONDS_MIN"
+                    :max="AUDIO_SECONDS_MAX"
+                    step="0.25"
+                    :value="settings.audioSeconds"
+                    aria-label="Custom clip length in seconds"
+                    @change="onCustomSeconds"
+                  />
+                  <span class="csuffix">s</span>
+                </div>
+              </div>
               <div class="camrow">
-                <ViseButton v-if="!mic.active.value" size="sm" @click="startMic">
-                  <ViseIcon name="mic" :size="13" /> Start microphone
-                </ViseButton>
+                <TwButton v-if="!mic.active.value" size="sm" @click="startMic">
+                  <TwIcon name="mic" :size="13" /> Start microphone
+                </TwButton>
                 <template v-else>
-                  <ViseButton size="sm" :disabled="recording" @click="recordClip">
-                    <ViseIcon name="mic" :size="13" /> {{ recording ? 'Recording...' : 'Record 1s' }}
-                  </ViseButton>
-                  <ViseButton size="sm" variant="ghost" @click="mic.stop()">Stop</ViseButton>
-                  <ViseStatus :state="recording ? 'run' : 'pass'">{{ recording ? 'recording' : 'ready' }}</ViseStatus>
+                  <TwButton size="sm" :disabled="recording" @click="recordClip">
+                    <TwIcon name="mic" :size="13" /> {{ recording ? 'Recording...' : `Record ${clipLabel}` }}
+                  </TwButton>
+                  <TwButton size="sm" variant="ghost" @click="mic.stop()">Stop</TwButton>
+                  <TwStatus :state="recording ? 'run' : 'pass'">{{ recording ? 'recording' : 'ready' }}</TwStatus>
                 </template>
               </div>
               <p v-if="mic.error.value" class="camerr">{{ mic.error.value }}</p>
@@ -356,9 +460,9 @@ const activeClassName = computed(
                 data-test="import-audio"
                 @change="onAudioFiles"
               />
-              <ViseButton variant="ghost" size="sm" :disabled="importing" @click="audioInput?.click()">
-                <ViseIcon name="mic" :size="13" /> {{ importing ? 'Importing...' : 'Import clips' }}
-              </ViseButton>
+              <TwButton variant="ghost" size="sm" :disabled="importing" @click="audioInput?.click()">
+                <TwIcon name="mic" :size="13" /> {{ importing ? 'Importing...' : 'Import clips' }}
+              </TwButton>
               <p class="hint">Each import batch is one capture session.</p>
             </div>
           </div>
@@ -369,10 +473,10 @@ const activeClassName = computed(
             Capture
             <span v-if="activeClassName" class="into">into {{ activeClassName }}</span>
           </p>
-          <ViseCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
+          <TwCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
             Select a class above, then record two second gesture windows from the device motion
             sensor or import recorded windows. Add an Idle class for the rest state.
-          </ViseCard>
+          </TwCard>
           <div v-else class="capture">
             <div class="cam">
               <svg v-if="motion.trace.value.length" class="trace" viewBox="0 0 120 48" preserveAspectRatio="none">
@@ -384,14 +488,14 @@ const activeClassName = computed(
                 />
               </svg>
               <div class="camrow">
-                <ViseButton v-if="!motion.active.value" size="sm" @click="startMotion">
-                  <ViseIcon name="motion" :size="13" /> Start sensor
-                </ViseButton>
+                <TwButton v-if="!motion.active.value" size="sm" @click="startMotion">
+                  <TwIcon name="motion" :size="13" /> Start sensor
+                </TwButton>
                 <template v-else>
-                  <ViseButton size="sm" :disabled="recording" @click="recordMotion">
-                    <ViseIcon name="motion" :size="13" /> {{ recording ? 'Recording...' : 'Record 2s' }}
-                  </ViseButton>
-                  <ViseButton size="sm" variant="ghost" @click="motion.stop()">Stop</ViseButton>
+                  <TwButton size="sm" :disabled="recording" @click="recordMotion">
+                    <TwIcon name="motion" :size="13" /> {{ recording ? 'Recording...' : 'Record 2s' }}
+                  </TwButton>
+                  <TwButton size="sm" variant="ghost" @click="motion.stop()">Stop</TwButton>
                 </template>
               </div>
               <p v-if="motion.error.value" class="camerr">{{ motion.error.value }}</p>
@@ -406,9 +510,9 @@ const activeClassName = computed(
                 data-test="import-motion"
                 @change="onMotionFiles"
               />
-              <ViseButton variant="ghost" size="sm" :disabled="importing" @click="motionInput?.click()">
-                <ViseIcon name="motion" :size="13" /> {{ importing ? 'Importing...' : 'Import windows' }}
-              </ViseButton>
+              <TwButton variant="ghost" size="sm" :disabled="importing" @click="motionInput?.click()">
+                <TwIcon name="motion" :size="13" /> {{ importing ? 'Importing...' : 'Import windows' }}
+              </TwButton>
               <p class="hint">JSON windows, one batch is one session.</p>
             </div>
           </div>
@@ -419,10 +523,10 @@ const activeClassName = computed(
             Examples
             <span v-if="activeClassName" class="into">into {{ activeClassName }}</span>
           </p>
-          <ViseCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
+          <TwCard v-if="!activeClassId" title="Pick a class first" meta="capture target">
             Select a class above, then type or paste example strings into it. Keep classes balanced.
             Add an Other class for everything else.
-          </ViseCard>
+          </TwCard>
           <div v-else class="textcap">
             <textarea
               v-model="textValue"
@@ -432,9 +536,9 @@ const activeClassName = computed(
               data-test="text-input"
               @keydown.enter.exact.prevent="addTextExample"
             ></textarea>
-            <ViseButton size="sm" :disabled="!textValue.trim()" @click="addTextExample">
-              <ViseIcon name="plus" :size="13" /> Add example
-            </ViseButton>
+            <TwButton size="sm" :disabled="!textValue.trim()" @click="addTextExample">
+              <TwIcon name="plus" :size="13" /> Add example
+            </TwButton>
           </div>
         </template>
 
@@ -442,16 +546,16 @@ const activeClassName = computed(
       </div>
 
       <aside class="right">
-        <ViseCard title="Coaching" meta="good data wins">
+        <TwCard title="Coaching" meta="good data wins">
           <ul class="coach">
             <li v-for="(tip, i) in info.coaching" :key="i">{{ tip }}</li>
           </ul>
-        </ViseCard>
+        </TwCard>
 
-        <ViseCard v-if="settings.expert" title="Expert" meta="data tools" accent>
+        <TwCard v-if="settings.expert" title="Expert" meta="data tools" accent>
           Per session review, leakage inspection, and class rebalancing surface here at the Expert
           altitude as the dataset grows.
-        </ViseCard>
+        </TwCard>
       </aside>
     </div>
   </section>
@@ -561,14 +665,18 @@ const activeClassName = computed(
   flex-direction: column;
   gap: var(--s-2);
 }
-.classbtn {
-  display: block;
-  width: 100%;
+.selbtn {
+  flex: 1;
+  min-width: 0;
   text-align: left;
   background: none;
   border: none;
   padding: 0;
   cursor: pointer;
+}
+.selbtn:focus-visible {
+  outline: 2px solid var(--live);
+  outline-offset: 2px;
 }
 .classrow {
   display: flex;
@@ -595,9 +703,77 @@ const activeClassName = computed(
   cursor: pointer;
   padding: 4px;
   display: inline-flex;
+  background: none;
+  border: none;
 }
 .del:hover {
   color: var(--rust);
+}
+.del:focus-visible {
+  outline: 2px solid var(--rust);
+  outline-offset: 2px;
+}
+.ready {
+  border: 1px solid var(--seam);
+  border-left: 2px solid var(--ash);
+  background: var(--graphite);
+  padding: var(--s-3) var(--s-4);
+  margin-bottom: var(--s-4);
+}
+.ready.go {
+  border-left-color: var(--live);
+  box-shadow: var(--cut-live);
+}
+.rhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.rmsg {
+  font-size: 11.5px;
+  color: var(--steam);
+  line-height: 1.5;
+  margin: var(--s-2) 0 0;
+}
+.rprog {
+  list-style: none;
+  margin: var(--s-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-4);
+}
+.rprog li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ash);
+}
+.rprog li.done {
+  color: var(--live);
+}
+.rdot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+  color: var(--live);
+}
+.rprog li.done .rdot {
+  border-color: var(--live);
+}
+.rpn {
+  font-family: var(--f-mono);
+}
+.rpc {
+  font-family: var(--f-label);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
 }
 .empty,
 .note {
@@ -629,6 +805,59 @@ const activeClassName = computed(
   align-items: center;
   gap: var(--s-3);
   margin-top: var(--s-3);
+}
+.cliplen {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.clab {
+  font-family: var(--f-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 9px;
+  color: var(--ash);
+}
+.cliprow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chip {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--steam);
+  background: var(--gunmetal);
+  border: 1px solid var(--seam);
+  padding: 4px 9px;
+  cursor: pointer;
+  transition: color var(--fast), border-color var(--fast);
+}
+.chip:hover {
+  border-color: var(--edge);
+  color: var(--chalk);
+}
+.chip.on {
+  border-color: var(--live);
+  color: var(--live);
+}
+.clipnum {
+  width: 5ch;
+  background: var(--gunmetal);
+  border: 1px solid var(--seam);
+  color: var(--chalk);
+  font-size: 11px;
+  padding: 4px 6px;
+}
+.clipnum:focus {
+  outline: none;
+  border-color: var(--live);
+  box-shadow: 0 0 0 3px var(--live-glow);
+}
+.csuffix {
+  font-family: var(--f-label);
+  font-size: 10px;
+  color: var(--ash);
 }
 .camerr {
   font-size: 11px;

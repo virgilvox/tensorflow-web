@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseCard renders a surface card with an optional header row and a body.
+ * TwCard renders a surface card with an optional header row and a body.
  * The header shows a title on the left and right-aligned meta text. A named
  * "header" slot can replace the title/meta layout entirely. The accent variant
  * adds a 3px live left border to flag the active item.

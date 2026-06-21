@@ -7,13 +7,14 @@
  * without a camera.
  */
 import { ref, computed, useTemplateRef } from 'vue';
-import ViseSectionHead from '../design/components/ViseSectionHead.vue';
-import ViseCard from '../design/components/ViseCard.vue';
-import ViseConfusion from '../design/components/ViseConfusion.vue';
-import ViseStatus from '../design/components/ViseStatus.vue';
-import ViseButton from '../design/components/ViseButton.vue';
-import ViseIcon from '../design/components/ViseIcon.vue';
+import TwSectionHead from '../design/components/TwSectionHead.vue';
+import TwCard from '../design/components/TwCard.vue';
+import TwConfusion from '../design/components/TwConfusion.vue';
+import TwStatus from '../design/components/TwStatus.vue';
+import TwButton from '../design/components/TwButton.vue';
+import TwIcon from '../design/components/TwIcon.vue';
 import { useProjectStore } from '../stores/project';
+import { useSettingsStore } from '../stores/settings';
 import { useTrainingStore } from '../stores/training';
 import { usePipeline } from '../composables/usePipeline';
 import { useCamera, CAPTURE_SIZE } from '../composables/useCamera';
@@ -25,6 +26,7 @@ import { fileToMotion } from '../lib/motionImport';
 import { formatPercent } from '../lib/format';
 
 const project = useProjectStore();
+const settings = useSettingsStore();
 const training = useTrainingStore();
 const pipeline = usePipeline();
 const camera = useCamera();
@@ -95,7 +97,7 @@ async function recordAndPredict(): Promise<void> {
   error.value = null;
   recording.value = true;
   try {
-    const clip = await mic.record();
+    const clip = await mic.record(settings.audioSeconds);
     predictions.value = await pipeline.predictAudio(clip.data, clip.sampleRate);
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err);
@@ -165,11 +167,11 @@ async function predictTextLive(): Promise<void> {
 
 <template>
   <section>
-    <ViseSectionHead index="05" title="Test" note="live and held out" />
+    <TwSectionHead index="05" title="Test" note="live and held out" />
 
-    <ViseCard title="Live inference" meta="fresh input">
+    <TwCard title="Live inference" meta="fresh input">
       <div v-if="!live" class="live">
-        <ViseStatus state="hold">awaiting a trained and exported model</ViseStatus>
+        <TwStatus state="hold">awaiting a trained and exported model</TwStatus>
         <p class="reason">
           Live confidence bars run the emitted model on fresh input. Train a model, then quantize
           and verify it in the Export stage to activate this panel.
@@ -180,12 +182,12 @@ async function predictTextLive(): Promise<void> {
         <div v-if="project.modality === 'image'" class="cam">
           <video ref="video" class="preview" playsinline muted></video>
           <div class="camrow">
-            <ViseButton v-if="!camera.active.value" size="sm" @click="startCamera">
-              <ViseIcon name="camera" :size="13" /> Start camera
-            </ViseButton>
-            <ViseButton v-else size="sm" @click="predictFromCamera">
-              <ViseIcon name="play" :size="13" /> Predict frame
-            </ViseButton>
+            <TwButton v-if="!camera.active.value" size="sm" @click="startCamera">
+              <TwIcon name="camera" :size="13" /> Start camera
+            </TwButton>
+            <TwButton v-else size="sm" @click="predictFromCamera">
+              <TwIcon name="play" :size="13" /> Predict frame
+            </TwButton>
             <input
               ref="fileInput"
               type="file"
@@ -194,21 +196,21 @@ async function predictTextLive(): Promise<void> {
               data-test="predict-file"
               @change="predictFromFile"
             />
-            <ViseButton variant="ghost" size="sm" @click="fileInput?.click()">
-              <ViseIcon name="image" :size="13" /> Predict an image
-            </ViseButton>
+            <TwButton variant="ghost" size="sm" @click="fileInput?.click()">
+              <TwIcon name="image" :size="13" /> Predict an image
+            </TwButton>
           </div>
           <p v-if="error" class="err">{{ error }}</p>
         </div>
 
         <div v-else-if="project.modality === 'audio'" class="cam">
           <div class="camrow">
-            <ViseButton v-if="!mic.active.value" size="sm" @click="startMic">
-              <ViseIcon name="mic" :size="13" /> Start microphone
-            </ViseButton>
-            <ViseButton v-else size="sm" :disabled="recording" @click="recordAndPredict">
-              <ViseIcon name="mic" :size="13" /> {{ recording ? 'Listening...' : 'Record and predict' }}
-            </ViseButton>
+            <TwButton v-if="!mic.active.value" size="sm" @click="startMic">
+              <TwIcon name="mic" :size="13" /> Start microphone
+            </TwButton>
+            <TwButton v-else size="sm" :disabled="recording" @click="recordAndPredict">
+              <TwIcon name="mic" :size="13" /> {{ recording ? 'Listening...' : 'Record and predict' }}
+            </TwButton>
             <input
               ref="audioInput"
               type="file"
@@ -217,21 +219,21 @@ async function predictTextLive(): Promise<void> {
               data-test="predict-audio-file"
               @change="predictAudioFromFile"
             />
-            <ViseButton variant="ghost" size="sm" @click="audioInput?.click()">
-              <ViseIcon name="mic" :size="13" /> Predict a clip
-            </ViseButton>
+            <TwButton variant="ghost" size="sm" @click="audioInput?.click()">
+              <TwIcon name="mic" :size="13" /> Predict a clip
+            </TwButton>
           </div>
           <p v-if="error" class="err">{{ error }}</p>
         </div>
 
         <div v-else-if="project.modality === 'motion'" class="cam">
           <div class="camrow">
-            <ViseButton v-if="!motion.active.value" size="sm" @click="startMotion">
-              <ViseIcon name="motion" :size="13" /> Start sensor
-            </ViseButton>
-            <ViseButton v-else size="sm" :disabled="recording" @click="recordMotionPredict">
-              <ViseIcon name="motion" :size="13" /> {{ recording ? 'Reading...' : 'Record and predict' }}
-            </ViseButton>
+            <TwButton v-if="!motion.active.value" size="sm" @click="startMotion">
+              <TwIcon name="motion" :size="13" /> Start sensor
+            </TwButton>
+            <TwButton v-else size="sm" :disabled="recording" @click="recordMotionPredict">
+              <TwIcon name="motion" :size="13" /> {{ recording ? 'Reading...' : 'Record and predict' }}
+            </TwButton>
             <input
               ref="motionInput"
               type="file"
@@ -240,9 +242,9 @@ async function predictTextLive(): Promise<void> {
               data-test="predict-motion-file"
               @change="predictMotionFromFile"
             />
-            <ViseButton variant="ghost" size="sm" @click="motionInput?.click()">
-              <ViseIcon name="motion" :size="13" /> Predict a window
-            </ViseButton>
+            <TwButton variant="ghost" size="sm" @click="motionInput?.click()">
+              <TwIcon name="motion" :size="13" /> Predict a window
+            </TwButton>
           </div>
           <p v-if="error" class="err">{{ error }}</p>
         </div>
@@ -256,9 +258,9 @@ async function predictTextLive(): Promise<void> {
             data-test="text-predict-input"
             @keydown.enter.exact.prevent="predictTextLive"
           ></textarea>
-          <ViseButton size="sm" :disabled="!textValue.trim()" @click="predictTextLive">
-            <ViseIcon name="play" :size="13" /> Predict
-          </ViseButton>
+          <TwButton size="sm" :disabled="!textValue.trim()" @click="predictTextLive">
+            <TwIcon name="play" :size="13" /> Predict
+          </TwButton>
           <p v-if="error" class="err">{{ error }}</p>
         </div>
 
@@ -267,7 +269,7 @@ async function predictTextLive(): Promise<void> {
             <span class="lab">prediction</span>
             <span class="topname" data-test="top-prediction">{{ top.name }}</span>
           </div>
-          <div v-for="p in predictions" :key="p.name" class="bar">
+          <div v-for="(p, i) in predictions" :key="i" class="bar">
             <span class="bn">{{ p.name }}</span>
             <span class="track"><span class="fill" :style="{ width: `${Math.round(p.score * 100)}%` }"></span></span>
             <span class="bv mono-num">{{ formatPercent(p.score) }}</span>
@@ -275,9 +277,9 @@ async function predictTextLive(): Promise<void> {
           <p v-if="!predictions.length" class="reason">Capture or pick an image to see confidence.</p>
         </div>
       </div>
-    </ViseCard>
+    </TwCard>
 
-    <ViseCard v-if="report" title="Held out accuracy" meta="from verify" accent class="mt">
+    <TwCard v-if="report" title="Held out accuracy" meta="from verify" accent class="mt">
       <div class="acc">
         <div class="accnum">
           <span class="lab">int8</span>
@@ -288,11 +290,11 @@ async function predictTextLive(): Promise<void> {
           <span class="big mono-num">{{ formatPercent(report.floatAcc ?? 0) }}</span>
         </div>
       </div>
-    </ViseCard>
+    </TwCard>
 
-    <ViseCard v-if="report?.confusion" title="Confusion matrix" meta="rows are true class" class="mt">
-      <ViseConfusion :matrix="report.confusion" :labels="classNames" />
-    </ViseCard>
+    <TwCard v-if="report?.confusion" title="Confusion matrix" meta="rows are true class" class="mt">
+      <TwConfusion :matrix="report.confusion" :labels="classNames" />
+    </TwCard>
   </section>
 </template>
 

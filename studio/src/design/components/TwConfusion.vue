@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseConfusion renders a confusion matrix as a dense HTML table. Rows are the
+ * TwConfusion renders a confusion matrix as a dense HTML table. Rows are the
  * true class and columns are the predicted class, so matrix[true][pred] holds
  * the count of samples of a given true label that were predicted as another.
  * Diagonal cells (correct predictions) carry a caution tint scaled by how large

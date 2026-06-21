@@ -5,6 +5,9 @@
  * the bytes already in hand; no network, no account.
  */
 import { toCArray, toCIdentifier, toTFLMSketch, type SketchOps } from '../lib/cformat';
+import { encodeBundle } from '../lib/modelBundle';
+import type { FeatureConfig } from '../features';
+import type { Modality } from '../types';
 
 /** Triggers a browser download of arbitrary bytes or text under a file name. */
 function download(filename: string, content: Uint8Array | string, mime: string): void {
@@ -66,5 +69,22 @@ export function useExport() {
     download(`${toCIdentifier(meta.name)}_metadata.json`, json, 'application/json');
   }
 
-  return { downloadTflite, downloadCArray, downloadSketch, downloadMetadata };
+  /**
+   * Downloads a single self-contained bundle (.tfwsmodel.json) carrying the
+   * .tflite bytes plus the modality, classes, feature config, and input shape,
+   * so the Playground can load and run the model with one file and no project.
+   */
+  function downloadBundle(input: {
+    name: string;
+    modality: Modality;
+    classes: string[];
+    featureConfig: FeatureConfig;
+    inputShape: number[];
+    audioSeconds?: number;
+    bytes: Uint8Array;
+  }): void {
+    download(`${toCIdentifier(input.name)}.tfwsmodel.json`, encodeBundle(input), 'application/json');
+  }
+
+  return { downloadTflite, downloadCArray, downloadSketch, downloadMetadata, downloadBundle };
 }

@@ -19,9 +19,16 @@ export interface AudioFeatureConfig {
   numCoeffs: number;
   /** Fixed number of time frames the grid is padded or truncated to. */
   targetFrames: number;
+  /**
+   * Clip length in seconds the grid is anchored to. Every clip is padded or
+   * truncated to this many samples before the spectrogram, and the hop is derived
+   * from it, so the same sound always maps to the same grid regardless of the
+   * recorded length. This is what keeps training and live inference consistent.
+   */
+  clipSeconds: number;
 }
 
-/** The default audio config: a 32 by 32 log mel grid at 16 kHz. */
+/** The default audio config: a 32 by 32 log mel grid over a one second clip. */
 export const DEFAULT_AUDIO_CONFIG: AudioFeatureConfig = {
   sampleRate: 16000,
   fftSize: 512,
@@ -30,6 +37,7 @@ export const DEFAULT_AUDIO_CONFIG: AudioFeatureConfig = {
   mode: 'mel',
   numCoeffs: 13,
   targetFrames: 32,
+  clipSeconds: 1,
 };
 
 /** Number of feature bands a config yields per frame. */
@@ -73,15 +81,26 @@ export function audioToFeatures(
   config: AudioFeatureConfig,
 ): Float32Array {
   const pcm = resample(samples, sampleRate, config.sampleRate);
+  // Anchor the analysis to a fixed clip length so the time axis is the same for
+  // every clip, whatever its recorded duration. Pad short clips with silence and
+  // truncate long ones to clipSeconds, then derive a single hop from that fixed
+  // sample count. Because the window length and hop depend only on the config,
+  // not on this clip's length, the same sound always maps to the same grid, so
+  // training and live inference stay consistent and a longer configured clip
+  // simply spans more time across the same fixed grid.
+  const fixedLen = Math.max(config.fftSize, Math.round(config.clipSeconds * config.sampleRate));
+  const win = new Float32Array(fixedLen);
+  win.set(pcm.subarray(0, Math.min(pcm.length, fixedLen)));
+  const hopSize = Math.max(1, Math.floor((fixedLen - config.fftSize) / Math.max(1, config.targetFrames - 1)));
   const opts: SpectrogramOptions = {
     sampleRate: config.sampleRate,
     fftSize: config.fftSize,
-    hopSize: config.hopSize,
+    hopSize,
     numMel: config.numMel,
     fmin: 20,
     fmax: config.sampleRate / 2,
   };
-  const spectral = config.mode === 'mfcc' ? mfcc(pcm, opts, config.numCoeffs) : logMelSpectrogram(pcm, opts);
+  const spectral = config.mode === 'mfcc' ? mfcc(win, opts, config.numCoeffs) : logMelSpectrogram(win, opts);
   const bands = bandsOf(config);
   const out = new Float32Array(config.targetFrames * bands);
 

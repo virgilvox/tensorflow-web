@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseSectionHead
+ * TwSectionHead
  * An index-tagged section header. Renders an optional accent number, a display
  * title, a rule that fills the remaining width of the row, and an optional mono
  * note aligned to the right. Used to separate major sections of a panel.

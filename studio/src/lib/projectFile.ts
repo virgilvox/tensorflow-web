@@ -45,7 +45,7 @@ function serializePayload(payload: SamplePayload): SerializedPayload {
 
 /** The error thrown for any file that is not a valid project file. */
 function invalid(): never {
-  throw new Error('Not a recognized VISE Studio project file.');
+  throw new Error('Not a recognized TF Web Studio project file.');
 }
 
 /** Rebuilds a payload's typed arrays from the JSON shape, validating its shape. */

@@ -1,8 +1,8 @@
-# VISE Studio plan
+# TF Web Studio plan
 
 A browser native, local first studio for training small models and shipping a
 verified int8 `.tflite`, built on the `tensorflow-web` library and styled with
-the VISE design system. It is a separate application in this repository that is
+the studio design system. It is a separate application in this repository that is
 never published with the library.
 
 ## 0. The thesis
@@ -13,7 +13,7 @@ and Lobe level simplicity that actually ships an int8 `.tflite` for bare metal
 edge devices. The simple tools (Teachable Machine, Lobe) do not target
 microcontrollers or hide deployment; the capable tools (Edge Impulse, SensiML,
 NanoEdge) require accounts, cloud upload, or paid deployment, and bury the user
-in jargon and expert decisions. VISE Studio fills that gap: everything runs in
+in jargon and expert decisions. TF Web Studio fills that gap: everything runs in
 the browser, nothing is uploaded, no account is needed, and the output is a
 verified int8 `.tflite` plus a ready to flash C array for an ESP32.
 
@@ -74,7 +74,7 @@ Patterns to adopt:
 
 ## 3. Positioning
 
-| Need | Teachable Machine | Edge Impulse | VISE Studio |
+| Need | Teachable Machine | Edge Impulse | TF Web Studio |
 | --- | --- | --- | --- |
 | No account, fully local | Yes | No | Yes |
 | Beginner can finish in minutes | Yes | No | Yes |
@@ -88,7 +88,7 @@ Patterns to adopt:
 
 ## 4. Design system and naming
 
-The studio uses the VISE design system verbatim for its visual language: the steel
+The studio uses the studio design system verbatim for its visual language: the steel
 surface scale, chalk and ash ink, the single caution accent `#ccf23e`, the patina
 secondary, square corners, hard cut shadows, the three typefaces (Chakra Petch for
 display and numbers, JetBrains Mono for body and data, Space Mono for labels), the
@@ -98,12 +98,12 @@ hazard stripe for live state, and the status squares.
 The design tokens become a single `tokens.css` (the `:root` block from the design
 system), and each demonstrated component becomes a small Vue component.
 
-Naming decision. The VISE brand and machine shop personality live in the visuals,
+Naming decision. The brand and machine shop personality live in the visuals,
 the typography, the jaw grip, and the gauges, not in the labels. The research is
 clear that invented stage names (Edge Impulse uses "impulse", "processing block",
 "learning block") force a glossary and slow beginners down. So the nav rail and
-stage titles use plain words: Data, Features, Model, Train, Test, Export. The VISE
-character carries the identity without costing clarity. Decided: stage labels are
+stage titles use plain words: Data, Features, Model, Train, Test, Export. The machine
+shop character carries the identity without costing clarity. Decided: stage labels are
 plain words. The machine shop personality stays in the visuals only.
 
 The altitude control from the design system (the Guided, Standard, Expert
@@ -111,7 +111,7 @@ segmented control) is the core of the beginner to expert experience and lives in
 the top bar. It drives progressive disclosure across every stage.
 
 The bench shell, mapped from the design system layout anatomy:
-- Top bar: VISE mark, the altitude control, the active project, the target device
+- Top bar: studio mark, the altitude control, the active project, the target device
   selector, and a local only indicator.
 - Nav rail: the workflow stages, the active one marked with the live left border.
 - Work panel: the current stage, gripped by the jaws. This is the one bold move,
@@ -286,7 +286,7 @@ All of these are achievable with the current library and browser APIs:
   reinvent the FFT; we keep the rest minimal and lightweight.
 - Charts are hand drawn SVG (a loss curve and the design system gauges), no heavy
   chart library.
-- The VISE design system implemented as Vue components, no third party UI kit.
+- The studio design system implemented as Vue components, no third party UI kit.
 
 ## 10. Architecture and folder layout
 
@@ -309,14 +309,14 @@ studio/
     App.vue               the bench shell (top bar, nav rail, grip, bench rail)
     router.ts             one route per stage
     design/
-      tokens.css          the VISE :root tokens
+      tokens.css          the studio :root tokens
       base.css            reset, fonts, grain overlay, scrollbars
       components/         one file per design system component
-        ViseTopBar.vue ViseNavRail.vue ViseBenchRail.vue ViseGrip.vue
-        ViseButton.vue ViseSegmented.vue ViseToggle.vue ViseSlider.vue
-        ViseField.vue ViseSelect.vue ViseStatus.vue ViseBadge.vue
-        ViseCard.vue ViseGauge.vue ViseHazard.vue ViseSectionHead.vue
-        ViseConfusion.vue ViseLossChart.vue ViseIcon.vue
+        TwTopBar.vue TwNavRail.vue TwBenchRail.vue TwGrip.vue
+        TwButton.vue TwSegmented.vue TwToggle.vue TwSlider.vue
+        TwField.vue TwSelect.vue TwStatus.vue TwBadge.vue
+        TwCard.vue TwGauge.vue TwHazard.vue TwSectionHead.vue
+        TwConfusion.vue TwLossChart.vue TwIcon.vue
     stages/
       DataView.vue FeaturesView.vue ModelView.vue
       TrainView.vue TestView.vue ExportView.vue
@@ -434,7 +434,7 @@ states this plainly.
    project in `studio/`. Implement `tokens.css`, `base.css`, and the core design
    components (button, segmented, card, status, gauge, field, slider), and the
    bench shell with the top bar, nav rail, jaw gripped work panel, and bench rail.
-   Exit: the app runs, renders in the VISE language, and the altitude control
+   Exit: the app runs, renders in the studio shell language, and the altitude control
    switches a visible disclosure state.
 
 2. Image, end to end, the flagship. Camera capture, class management with the
@@ -476,7 +476,7 @@ states this plainly.
 
 TensorFlow.js and the `tensorflow-web` library; the TensorFlow Lite WASM
 interpreter for verification and live inference; the FFT library used for
-spectrograms; Vue, Pinia, and Vite; the VISE design system; and an acknowledgement
+spectrograms; Vue, Pinia, and Vite; the studio design system; and an acknowledgement
 that the experience design was informed by studying Edge Impulse, Google Teachable
 Machine, and Microsoft Lobe, and by the documented best practices in the
 TensorFlow, LiteRT, and TinyML literature.
@@ -484,7 +484,7 @@ TensorFlow, LiteRT, and TinyML literature.
 ## 19. Decisions, resolved
 
 1. Stage labels are plain words: Data, Features, Model, Train, Test, Export. The
-   VISE machine shop character is visual only.
+   machine shop character is visual only.
 2. Image, audio, and motion lead and are built first. Text, as a bag of words MLP,
    is included alongside them, not deferred, with its limits called out.
 3. Transfer learning for image stays out of scope. Any future Expert path for it

@@ -6,8 +6,8 @@
  * stores and renders read only; every stage writes the state it shows.
  */
 import { computed } from 'vue';
-import ViseStatus from './ViseStatus.vue';
-import ViseHazard from './ViseHazard.vue';
+import TwStatus from './TwStatus.vue';
+import TwHazard from './TwHazard.vue';
 import { useProjectStore } from '../../stores/project';
 import { useTrainingStore } from '../../stores/training';
 import { useSettingsStore } from '../../stores/settings';
@@ -46,11 +46,11 @@ const fit = computed(() => {
 
 <template>
   <footer class="bench">
-    <ViseHazard v-if="training.running" :height="4" />
+    <TwHazard v-if="training.running" :height="4" />
     <div class="readouts">
       <div class="cell job">
         <span class="k">Job</span>
-        <ViseStatus :state="jobState.state">{{ jobState.label }}</ViseStatus>
+        <TwStatus :state="jobState.state">{{ jobState.label }}</TwStatus>
       </div>
 
       <div class="cell">
@@ -75,7 +75,7 @@ const fit = computed(() => {
 
       <div class="cell">
         <span class="k">Fit</span>
-        <ViseStatus :state="fit.state">{{ fit.label }}</ViseStatus>
+        <TwStatus :state="fit.state">{{ fit.label }}</TwStatus>
       </div>
     </div>
   </footer>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseStatus renders a small status indicator made of a colored square and an
+ * TwStatus renders a small status indicator made of a colored square and an
  * uppercase label. The square color encodes the state. The running state pulses
  * to signal active work, every other state is static. The label text is supplied
  * through the default slot so callers control the wording.

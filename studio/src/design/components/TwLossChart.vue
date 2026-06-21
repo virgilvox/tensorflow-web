@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseLossChart draws a hand built SVG line chart of training metrics
+ * TwLossChart draws a hand built SVG line chart of training metrics
  * across epochs without any charting library. It plots the loss curve as
  * a polyline normalized so the largest loss sits at the top of the box and
  * zero sits at the bottom. An optional accuracy series is plotted on a fixed

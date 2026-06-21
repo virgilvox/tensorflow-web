@@ -125,7 +125,7 @@ try {
     const perBatch = 8;
     const expected = CLASSES.length * 2 * perBatch;
     for (let c = 0; c < CLASSES.length; c++) {
-      await page.locator('.classbtn', { hasText: CLASSES[c].name }).first().click();
+      await page.locator('.selbtn', { hasText: CLASSES[c].name }).first().click();
       for (const session of [0, 1]) {
         await page.setInputFiles('input[data-test="import-audio"]', batch(c, session, perBatch));
         await page.waitForTimeout(120);

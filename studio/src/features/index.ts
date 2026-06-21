@@ -54,18 +54,34 @@ export function defaultFeatureConfig(modality: Modality): FeatureConfig {
   }
 }
 
+/** Options that tune a built feature config beyond what the samples imply. */
+export interface FeatureConfigOptions {
+  /** Audio clip length in seconds the spectrogram grid is anchored to. */
+  audioSeconds?: number;
+}
+
 /**
- * Builds a feature config for a modality from training samples. Only text needs
- * the data (to build its vocabulary); the others return their static default.
- * The vocabulary is built from the supplied samples only, so passing the train
- * split keeps the test set out of the vocabulary.
+ * Builds a feature config for a modality from training samples. Text builds its
+ * vocabulary from the supplied samples (pass the train split to keep the test set
+ * out of it); audio anchors its grid to the configured clip length; the others
+ * return their static default.
  */
-export function buildFeatureConfig(modality: Modality, samples: Sample[]): FeatureConfig {
-  if (modality !== 'text') return defaultFeatureConfig(modality);
-  const texts = samples
-    .map((s) => (s.payload.kind === 'text' ? s.payload.text : ''))
-    .filter((t) => t.length > 0);
-  return { kind: 'text', text: { vocab: buildVocabulary(texts) } };
+export function buildFeatureConfig(
+  modality: Modality,
+  samples: Sample[],
+  options: FeatureConfigOptions = {},
+): FeatureConfig {
+  if (modality === 'text') {
+    const texts = samples
+      .map((s) => (s.payload.kind === 'text' ? s.payload.text : ''))
+      .filter((t) => t.length > 0);
+    return { kind: 'text', text: { vocab: buildVocabulary(texts) } };
+  }
+  if (modality === 'audio') {
+    const clipSeconds = options.audioSeconds ?? DEFAULT_AUDIO_CONFIG.clipSeconds;
+    return { kind: 'audio', audio: { ...DEFAULT_AUDIO_CONFIG, clipSeconds } };
+  }
+  return defaultFeatureConfig(modality);
 }
 
 /** The per sample tensor shape a feature config produces, batch aside. */

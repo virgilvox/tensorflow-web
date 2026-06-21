@@ -1,29 +1,29 @@
 <script setup lang="ts">
 /**
- * The bench shell. Four zones from the VISE layout anatomy: the fixed top bar,
+ * The bench shell. Four zones from the TF Web Studio layout anatomy: the fixed top bar,
  * the nav rail, the jaw gripped work panel that holds the active stage, and the
  * persistent bench rail. The router fills the work panel; the altitude control
  * in the top bar drives disclosure across whatever stage is mounted.
  */
-import ViseTopBar from './design/components/ViseTopBar.vue';
-import ViseNavRail from './design/components/ViseNavRail.vue';
-import ViseBenchRail from './design/components/ViseBenchRail.vue';
-import ViseGrip from './design/components/ViseGrip.vue';
+import TwTopBar from './design/components/TwTopBar.vue';
+import TwNavRail from './design/components/TwNavRail.vue';
+import TwBenchRail from './design/components/TwBenchRail.vue';
+import TwGrip from './design/components/TwGrip.vue';
 </script>
 
 <template>
-  <ViseTopBar />
+  <TwTopBar />
   <div class="body">
-    <ViseNavRail />
+    <TwNavRail />
     <main class="work-area">
-      <ViseGrip>
+      <TwGrip>
         <RouterView v-slot="{ Component }">
           <component :is="Component" />
         </RouterView>
-      </ViseGrip>
+      </TwGrip>
     </main>
   </div>
-  <ViseBenchRail />
+  <TwBenchRail />
 </template>
 
 <style scoped>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseSlider
+ * TwSlider
  *
  * A range slider with an uppercase label on the left and the live current
  * value on the right. Wraps a native range input and reports numeric changes

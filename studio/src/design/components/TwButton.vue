@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The VISE button. Caution yellow fill by default, a ghost outline variant, a
+ * The TF Web Studio button. Caution yellow fill by default, a ghost outline variant, a
  * small size, and a danger variant for cancel and destroy actions. Square
  * corners, uppercase label type, a one pixel translateY lift on hover.
  */

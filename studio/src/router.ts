@@ -57,6 +57,13 @@ const routes: RouteRecordRaw[] = [
     name: 'export',
     component: () => import('./stages/ExportView.vue'),
   },
+  {
+    // Standalone, outside the staged spine: runs the current model, a bundle, or
+    // an uploaded .tflite live, with no project required.
+    path: '/playground',
+    name: 'playground',
+    component: () => import('./stages/PlaygroundView.vue'),
+  },
 ];
 
 export const router = createRouter({

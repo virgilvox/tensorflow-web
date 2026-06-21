@@ -1,11 +1,11 @@
 {
-  "name": "vise-studio",
+  "name": "tf-web-studio",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
   "author": "Moheeb Zara",
-  "description": "VISE Studio: a browser native, local first studio that trains small models and ships a verified int8 .tflite. Built on tensorflow-web. Never published with the library.",
+  "description": "TF Web Studio: a browser native, local first studio that trains small models and ships a verified int8 .tflite. Built on tensorflow-web. Never published with the library.",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",

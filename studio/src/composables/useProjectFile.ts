@@ -25,7 +25,7 @@ export function useProjectFile() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${toCIdentifier(project.name)}.viseproj.json`;
+    a.download = `${toCIdentifier(project.name)}.tfwsproj.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();

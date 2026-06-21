@@ -16,15 +16,25 @@ export const TARGET_DEVICES: readonly TargetDevice[] = [
   { id: 'cortex-m4', name: 'Cortex M4', flashBytes: 512 * 1024, ramBytes: 128 * 1024 },
 ];
 
+/** Bounds on the audio clip length, in seconds. Longer clips mean a larger
+ *  spectrogram span and a heavier model, so the upper bound stays modest. */
+export const AUDIO_SECONDS_MIN = 0.25;
+export const AUDIO_SECONDS_MAX = 10;
+/** Quick-pick clip lengths offered in the capture UI, in seconds. */
+export const AUDIO_SECONDS_PRESETS: readonly number[] = [1, 2, 4];
+
 interface SettingsState {
   altitude: AltitudeLevel;
   targetId: TargetDeviceId;
+  /** Microphone clip length for new audio captures, in seconds. */
+  audioSeconds: number;
 }
 
 export const useSettingsStore = defineStore('settings', {
   state: (): SettingsState => ({
     altitude: 'guided',
     targetId: 'esp32s3',
+    audioSeconds: 1,
   }),
   getters: {
     /** True when configuration stages (Features, Model) are visible at all. */
@@ -44,6 +54,11 @@ export const useSettingsStore = defineStore('settings', {
     },
     setTarget(id: TargetDeviceId): void {
       this.targetId = id;
+    },
+    /** Sets the audio clip length, clamped to the supported range. */
+    setAudioSeconds(seconds: number): void {
+      if (!Number.isFinite(seconds)) return;
+      this.audioSeconds = Math.min(AUDIO_SECONDS_MAX, Math.max(AUDIO_SECONDS_MIN, seconds));
     },
   },
 });

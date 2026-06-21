@@ -33,7 +33,7 @@
   overflow: auto;
   padding: var(--s-6);
 }
-/* The vise jaws, gripping the panel at the vertical midpoint. */
+/* The clamp jaws, gripping the panel at the vertical midpoint. */
 .jaw {
   position: absolute;
   top: 50%;

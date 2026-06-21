@@ -1,6 +1,6 @@
 /**
  * Phase 1 headless smoke. Starts the Vite dev server, opens the studio in the
- * system Chrome through Playwright, and confirms the shell renders in the VISE
+ * system Chrome through Playwright, and confirms the shell renders in the TF Web Studio
  * language and that the altitude control switches a visible disclosure state:
  * the Features and Model stages are hidden in Guided and appear from Standard up.
  *
@@ -54,9 +54,9 @@ try {
     await page.goto(base, { waitUntil: 'networkidle' });
     await page.waitForSelector('.topbar', { timeout: 15000 });
 
-    // Renders in the VISE language: the wordmark and the local only badge.
+    // Renders in the studio shell language: the wordmark and the local only badge.
     const wordmark = await page.textContent('.topbar .word');
-    check('VISE wordmark renders', wordmark?.trim() === 'VISE', `got "${wordmark}"`);
+    check('TF Web wordmark renders', wordmark?.trim() === 'TF Web', `got "${wordmark}"`);
 
     const localBadge = await page.textContent('.topbar .local');
     check('local only indicator present', /local only/i.test(localBadge ?? ''));

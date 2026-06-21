@@ -8,13 +8,13 @@
  */
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import ViseSectionHead from '../design/components/ViseSectionHead.vue';
-import ViseButton from '../design/components/ViseButton.vue';
-import ViseGauge from '../design/components/ViseGauge.vue';
-import ViseLossChart from '../design/components/ViseLossChart.vue';
-import ViseStatus from '../design/components/ViseStatus.vue';
-import ViseSlider from '../design/components/ViseSlider.vue';
-import ViseIcon from '../design/components/ViseIcon.vue';
+import TwSectionHead from '../design/components/TwSectionHead.vue';
+import TwButton from '../design/components/TwButton.vue';
+import TwGauge from '../design/components/TwGauge.vue';
+import TwLossChart from '../design/components/TwLossChart.vue';
+import TwStatus from '../design/components/TwStatus.vue';
+import TwSlider from '../design/components/TwSlider.vue';
+import TwIcon from '../design/components/TwIcon.vue';
 import { useProjectStore } from '../stores/project';
 import { useTrainingStore } from '../stores/training';
 import { useSettingsStore } from '../stores/settings';
@@ -60,39 +60,39 @@ const latestAcc = computed(() => training.latest?.acc);
 
 <template>
   <section>
-    <ViseSectionHead index="04" title="Train" note="local and unlimited, runs in this tab" />
+    <TwSectionHead index="04" title="Train" note="local and unlimited, runs in this tab" />
 
     <div class="head">
-      <ViseButton :disabled="!ready || training.running" @click="startTraining">
-        <ViseIcon name="play" :size="14" /> Train model
-      </ViseButton>
-      <ViseButton v-if="training.running" variant="danger" size="sm" @click="pipeline.cancel()">
-        <ViseIcon name="stop" :size="13" /> Cancel
-      </ViseButton>
-      <ViseButton v-if="training.status === 'done'" variant="ghost" size="sm" @click="goExport">
-        <ViseIcon name="export" :size="13" /> Go to Export
-      </ViseButton>
-      <ViseStatus :state="training.running ? 'run' : training.status === 'done' ? 'pass' : 'hold'">
+      <TwButton :disabled="!ready || training.running" @click="startTraining">
+        <TwIcon name="play" :size="14" /> Train model
+      </TwButton>
+      <TwButton v-if="training.running" variant="danger" size="sm" @click="pipeline.cancel()">
+        <TwIcon name="stop" :size="13" /> Cancel
+      </TwButton>
+      <TwButton v-if="training.status === 'done'" variant="ghost" size="sm" @click="goExport">
+        <TwIcon name="export" :size="13" /> Go to Export
+      </TwButton>
+      <TwStatus :state="training.running ? 'run' : training.status === 'done' ? 'pass' : 'hold'">
         {{ training.running ? `epoch ${training.epoch}/${training.totalEpochs}` : training.status }}
-      </ViseStatus>
+      </TwStatus>
     </div>
 
     <p v-if="!ready" class="block">{{ blockReason }}</p>
     <p v-if="error" class="block err">{{ error }}</p>
 
     <div v-if="settings.editable" class="knob">
-      <ViseSlider v-model="epochs" label="Epochs" :min="1" :max="60" :step="1" />
+      <TwSlider v-model="epochs" label="Epochs" :min="1" :max="60" :step="1" />
     </div>
 
     <div class="gauges">
-      <ViseGauge label="Progress" :fraction="training.progress" :value="formatPercent(training.progress)" />
-      <ViseGauge
+      <TwGauge label="Progress" :fraction="training.progress" :value="formatPercent(training.progress)" />
+      <TwGauge
         label="Loss"
         :fraction="training.latest ? Math.max(0, 1 - training.latest.loss) : 0"
         :value="formatFixed(training.latest?.loss, 3)"
         cool
       />
-      <ViseGauge
+      <TwGauge
         label="Accuracy"
         :fraction="latestAcc ?? 0"
         :value="latestAcc === undefined ? '·' : formatPercent(latestAcc)"
@@ -100,7 +100,7 @@ const latestAcc = computed(() => training.latest?.acc);
     </div>
 
     <div class="chart">
-      <ViseLossChart :loss="lossSeries" :acc="accSeries.length ? accSeries : undefined" />
+      <TwLossChart :loss="lossSeries" :acc="accSeries.length ? accSeries : undefined" />
     </div>
   </section>
 </template>

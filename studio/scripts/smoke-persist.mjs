@@ -48,7 +48,7 @@ async function addText(page, classes) {
     await page.waitForTimeout(50);
   }
   for (const n of classes) {
-    await page.locator('.classbtn', { hasText: n }).first().click();
+    await page.locator('.selbtn', { hasText: n }).first().click();
     for (let i = 0; i < 6; i++) {
       await page.fill('[data-test="text-input"]', `${n} example phrase variant ${i}`);
       await page.getByRole('button', { name: /Add example/i }).click();
@@ -101,7 +101,7 @@ try {
       await page.goto(base, { waitUntil: 'networkidle' });
       await page.waitForSelector('.topbar');
       await addText(page, ['alpha', 'beta', 'gamma']);
-      await page.locator('.classbtn', { hasText: 'gamma' }).first().locator('.del').click();
+      await page.locator('.classrow', { hasText: 'gamma' }).first().locator('.del').click();
       await page.waitForTimeout(300);
       await page.reload({ waitUntil: 'networkidle' });
       await page.waitForSelector('.topbar');

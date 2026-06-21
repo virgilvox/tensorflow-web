@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * ViseSelect renders a labelled dropdown styled to match the field input.
+ * TwSelect renders a labelled dropdown styled to match the field input.
  * The label sits above the select, wired to it by a unique id for
  * accessibility, and the select shows a live focus ring when active.
  * Two way binding flows through modelValue and update:modelValue.
@@ -25,7 +25,7 @@ const emit = defineEmits<{
 }>()
 
 /** Unique id so the label points at exactly this select instance. */
-const selectId = `vise-select-${Math.random().toString(36).slice(2, 10)}`
+const selectId = `tw-select-${Math.random().toString(36).slice(2, 10)}`
 
 /** Forward native change events to the parent as a v-model update. */
 function onChange(event: Event): void {
