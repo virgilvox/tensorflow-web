@@ -44,6 +44,8 @@ path:
 - Audio: microphone or clip import, a log mel spectrogram, a small CNN. The
   microphone clip length is selectable (1, 2, 4 seconds, or any value); the
   spectrogram spans the whole clip across a fixed grid, so the model stays small.
+  Loudness is scaled against a fixed reference, not each clip's own range, so a
+  quiet background stays distinguishable from a spoken keyword.
 - Motion: device accelerometer or window import, a resampled window, a small MLP.
 - Text: typed or pasted strings, a bag of words encoding, a small MLP.
 
@@ -125,6 +127,7 @@ npm run test            # unit tests
 npm run smoke           # the phase 1 shell smoke
 node scripts/smoke-image.mjs   # image flow, end to end
 node scripts/smoke-audio.mjs   # audio keyword spotting
+node scripts/smoke-audio-bg.mjs    # audio: loud keyword vs quiet background
 node scripts/smoke-mt.mjs      # motion and text
 node scripts/smoke-expert.mjs  # expert depth, project save and load
 node scripts/smoke-persist.mjs # reload persistence

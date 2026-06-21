@@ -68,7 +68,7 @@ green, and only with the maintainer's go ahead.
 ```
 npm install
 npm run typecheck                # vue-tsc, expect 0 errors
-npm run test                     # Vitest unit tests, expect 59 passing
+npm run test                     # Vitest unit tests, expect 60 passing
 node scripts/smoke.mjs           # shell smoke (10 checks)
 node scripts/smoke-image.mjs     # image flow end to end (7)
 node scripts/smoke-audio.mjs     # audio keyword spotting (6)
@@ -76,10 +76,11 @@ node scripts/smoke-mt.mjs        # motion and text (10)
 node scripts/smoke-expert.mjs    # expert depth + project save/load (5)
 node scripts/smoke-persist.mjs   # reload persistence regression (4)
 node scripts/smoke-playground.mjs # playground: current model + reloaded bundle (6)
+node scripts/smoke-audio-bg.mjs  # audio: loud keyword vs quiet background (5)
 npm run dev                      # http://localhost:5173 (or next free port)
 ```
 
-Last known good: typecheck 0, 59 unit tests, and all seven smokes green. The smokes
+Last known good: typecheck 0, 60 unit tests, and all eight smokes green. The smokes
 use the system Chrome through Playwright (`channel: 'chrome', headless: true`),
 start their own Vite server, and inject learnable data through the real file or
 text import UI, since a headless browser has no camera, microphone, or motion
@@ -162,6 +163,12 @@ These were each a bug or a near miss. Keep them true.
    length. Keep the pad/truncate-to-clipSeconds step so the same sound maps to the
    same grid; deriving the hop from a single clip's length silently warps the time
    axis and breaks train/live parity.
+13. Audio log mel is mapped to 0..1 against a FIXED reference (`LOG_FLOOR`/`LOG_CEIL`
+   in `features/audio`), never a per-clip min-max. Per-clip min-max stretched a
+   quiet Background Noise clip to full contrast, so a keyword model predicted the
+   keyword for near-silence (a real, reported bug). `smoke-audio-bg.mjs` guards it:
+   a quiet clip must predict the background class, not the keyword. Do not
+   reintroduce per-clip min-max for mel features.
 
 ## Hard boundary with the library
 

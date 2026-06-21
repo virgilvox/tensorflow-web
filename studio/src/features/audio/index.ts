@@ -7,6 +7,20 @@
  */
 import { logMelSpectrogram, mfcc, type SpectrogramOptions } from '../../lib/dsp';
 
+/**
+ * Fixed log mel range mapped to 0..1. The floor matches the 1e-6 log floor in the
+ * spectrogram (a silent frame), and the ceiling is the largest power a full scale
+ * frame can produce for the default FFT (|X| <= sum of the window <= fftSize/2, so
+ * power <= (fftSize/2)^2). Mapping against this fixed reference, not each clip's
+ * own min and max, is deliberate: a per-clip min-max stretches a quiet clip (room
+ * noise, a Background Noise sample) to full contrast, so it looks as strong as a
+ * spoken keyword and the model predicts the keyword for near-silence. A fixed
+ * reference keeps quiet inputs low and loud inputs high, preserving the amplitude
+ * difference between a keyword and the background.
+ */
+const LOG_FLOOR = Math.log(1e-6);
+const LOG_CEIL = Math.log(65536);
+
 /** The audio preprocessing config. Mel for general sounds, MFCC for keywords. */
 export interface AudioFeatureConfig {
   sampleRate: number;
@@ -108,23 +122,35 @@ export function audioToFeatures(
   const copyFrames = Math.min(config.targetFrames, spectral.frames);
   out.set(spectral.data.subarray(0, copyFrames * bands), 0);
 
-  // Normalize the populated region to 0..1 so the int8 input boundary is stable.
-  let min = Infinity;
-  let max = -Infinity;
   const populated = copyFrames * bands;
-  for (let i = 0; i < populated; i++) {
-    const v = out[i]!;
-    if (v < min) min = v;
-    if (v > max) max = v;
-  }
-  const range = max - min;
-  if (range > 1e-9) {
-    for (let i = 0; i < populated; i++) out[i] = (out[i]! - min) / range;
+  if (config.mode === 'mfcc') {
+    // MFCC coefficients are not log energies, so a fixed energy reference does not
+    // apply; keep a per-clip range here. The default pipeline is mel, below.
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < populated; i++) {
+      const v = out[i]!;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    const range = max - min;
+    if (range > 1e-9) {
+      for (let i = 0; i < populated; i++) out[i] = (out[i]! - min) / range;
+    } else {
+      for (let i = 0; i < populated; i++) out[i] = 0;
+    }
   } else {
-    // A silent or constant energy clip has no range to normalize. Zero it so the
-    // input boundary stays in 0..1 rather than keeping raw log domain values,
-    // matching the motion extractor's degenerate case handling.
-    for (let i = 0; i < populated; i++) out[i] = 0;
+    // Map log mel energies to 0..1 against the fixed reference, not a per-clip
+    // min-max. A silent frame sits at LOG_FLOOR and maps to 0; a loud frame maps
+    // high. The amplitude difference between a keyword and quiet background is
+    // preserved, so the model can tell them apart instead of treating every
+    // non-silent input as the keyword.
+    const span = LOG_CEIL - LOG_FLOOR;
+    for (let i = 0; i < populated; i++) {
+      out[i] = Math.min(1, Math.max(0, (out[i]! - LOG_FLOOR) / span));
+    }
   }
+  // The unpopulated tail (when fewer than targetFrames frames were produced) stays
+  // at the array's zero fill, which is the 0 = silence value in this scale.
   return out;
 }

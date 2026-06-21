@@ -34,6 +34,21 @@ describe('audioToFeatures', () => {
     expect(f.length).toBe(32 * 32);
   });
 
+  it('keeps a quiet clip distinct from a loud one, not stretched to full scale', () => {
+    // Regression: per-clip min-max normalization made a quiet clip look as loud as
+    // a full scale one, so a keyword model predicted the keyword for near-silence.
+    // The same tone at 1/100th amplitude must map clearly lower, not to full range.
+    const loud = sine(1000, 16000, 16000);
+    const quiet = new Float32Array(16000);
+    for (let i = 0; i < quiet.length; i++) quiet[i] = 0.01 * Math.sin((2 * Math.PI * 1000 * i) / 16000);
+    const fLoud = audioToFeatures(loud, 16000, DEFAULT_AUDIO_CONFIG);
+    const fQuiet = audioToFeatures(quiet, 16000, DEFAULT_AUDIO_CONFIG);
+    const maxLoud = Math.max(...fLoud);
+    const maxQuiet = Math.max(...fQuiet);
+    expect(maxLoud).toBeGreaterThan(0.7);
+    expect(maxQuiet).toBeLessThan(maxLoud - 0.15);
+  });
+
   it('maps a silent clip to all zeros, not raw log domain values', () => {
     const silence = new Float32Array(16000);
     const f = audioToFeatures(silence, 16000, DEFAULT_AUDIO_CONFIG);
