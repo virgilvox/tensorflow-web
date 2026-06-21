@@ -19,7 +19,13 @@ export default defineConfig({
     // and two nominal Tensor types. Dedupe only the meta package so both resolve
     // to the studio copy; its nested tfjs-core, layers, and converter stay
     // version matched (deduping those mixes versions and breaks internal imports).
-    dedupe: ['@tensorflow/tfjs'],
+    //
+    // flatbuffers is deduped for a different reason: the library source at ../src
+    // imports it at runtime, but that import resolves relative to ../src, i.e. the
+    // repo-root node_modules, which a studio-only deploy (DigitalOcean) does not
+    // install. Deduping forces it to resolve from the studio's own node_modules,
+    // where it is a direct dependency.
+    dedupe: ['@tensorflow/tfjs', 'flatbuffers'],
   },
   // @tensorflow/tfjs-tflite is a WASM build whose module layout the Vite
   // dependency optimizer cannot process. It is loaded from a CDN script tag (see
