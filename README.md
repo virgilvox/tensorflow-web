@@ -2,6 +2,8 @@
 
 Train a model with TensorFlow.js in a browser tab and emit a verified `.tflite` file. TensorFlow.js does the training. `tensorflow-web` adds the half TensorFlow.js does not have: it calibrates the trained model over representative data, quantizes it to int8 with post training quantization, serializes a real TensorFlow Lite FlatBuffer, and then verifies that the emitted file reproduces the float model's numbers in an actual interpreter. It is a headless library. It has no user interface of its own, returns plain data and promises, and leaves all presentation to the host application.
 
+**Live demo: [tensorflow.tools](https://tensorflow.tools).** It runs [TF Web Studio](#tf-web-studio), a full application built on this library that collects data, trains a model, and exports a verified `.tflite` for a microcontroller, entirely in your browser. The library is on npm as [`tensorflow-web`](https://www.npmjs.com/package/tensorflow-web).
+
 ## The one constraint to understand first
 
 Training is general. Export is bounded by the op registry.
@@ -167,7 +169,11 @@ Adding support for a new layer is a small, isolated change: write a converter un
 
 ## TF Web Studio
 
-[`studio/`](./studio/README.md) holds TF Web Studio, a browser native, local first application built on this library: collect data, train a small model, test it live, and export a verified int8 `.tflite` for image, audio, motion, and text. A standalone Playground runs the trained model, an exported bundle, or an uploaded `.tflite` live against fresh camera, microphone, motion, or text input. It is a separate package with its own dependencies, imports the library source through a Vite alias, and is never published with the library. See its [README](./studio/README.md) to run it.
+The live demo at **[tensorflow.tools](https://tensorflow.tools)** is TF Web Studio, the reference application built on this library. Its source is in [`studio/`](./studio/README.md).
+
+It is the whole combination in one place: TensorFlow.js trains the model, this library calibrates, quantizes to int8, serializes, and verifies parity, and the studio adds the data collection, the live test, and a TFLite Micro export path. You collect data in the browser (image, audio, motion, or text), train a small model, test it live, and export a verified int8 `.tflite` plus a C array and a TFLite Micro sketch for a microcontroller. A standalone Playground runs the trained model, an exported bundle, or an uploaded `.tflite` live against the camera, microphone, motion sensor, or typed text. Nothing leaves the browser.
+
+The studio is a separate package with its own dependencies; it imports the library source through a Vite alias and is never published with the library. See its [README](./studio/README.md) to run it locally.
 
 ## License
 
