@@ -10,7 +10,9 @@ TF Web Studio is a browser native, local first studio that collects data, trains
 small model, tests it live, and exports a verified int8 `.tflite` plus a C array
 and a TFLite Micro sketch. It is built on the headless `tensorflow-web` library
 in this same repository and is a separate package in `studio/` that is never
-published with the library. The full product spec is [`PLAN.md`](./PLAN.md).
+published with the library. The full product spec is [`PLAN.md`](./PLAN.md). The
+library is published on npm as `tensorflow-web` (v0.1.2); the studio is the live
+demo deployed at [tensorflow.tools](https://tensorflow.tools).
 
 ## Status: complete through phase 5, audited and hardened
 
@@ -78,20 +80,15 @@ Added after the original five phases (audit driven and on request):
   the model's FROZEN `featureCfg.audio.clipSeconds`, not the mutable
   `settings.audioSeconds`, so changing the clip control after training cannot feed
   the model a differently anchored clip.
+- Deployed as a static site (DigitalOcean) at [tensorflow.tools](https://tensorflow.tools).
+  Getting there needed two studio-only build fixes (see Deployment below). The top
+  bar links to the GitHub repo (`virgilvox/tensorflow-web`) and the bench-rail
+  footer credits hack.build.
 
-Commit history (newest first):
-
-- `889b064` Fix class persistence so reloading does not orphan samples (NOT yet
-  pushed at the time of writing; everything below it is pushed to origin/main)
-- `7316b40` Harden the studio after an audit: enforce parity, fix leaks and edge cases
-- `807265e` Add expert depth, project save and load, and the README
-- `a839165` Add motion and text flows end to end
-- `50c3f2e` Add audio keyword spotting end to end
-- `94e7fd2` Add the image flow end to end, the flagship
-- `b821501` Add VISE Studio shell: scaffold, design system, and bench
-
-There is one unpushed commit (`889b064`). Push it after confirming the suite is
-green, and only with the maintainer's go ahead.
+Everything above is committed and pushed to `origin/main`: the original five build
+phases, the rename to TF Web Studio, the audio and motion fixed-scale fixes, the
+Playground, the Standard-altitude controls, the deploy fixes, and the README and
+site links. Run `git log --oneline` for the detailed history.
 
 ## How to verify (run from `studio/`)
 
@@ -120,15 +117,38 @@ real TFLite interpreter, an int8 accuracy at or above the floor, a device fit,
 and a correct live prediction. Verify and live inference need network for the
 TFLite WASM interpreter loaded from a CDN.
 
+## Deployment
+
+The studio is a static Vite SPA, deployed to DigitalOcean App Platform as a
+**Static Site**: source directory `studio`, build command `npm run build`, output
+directory `dist`, no run command. It uses hash routing (`createWebHashHistory`),
+so deep links work on static hosting with no rewrite rules. At runtime the client
+loads tfjs and the TFLite WASM interpreter from a CDN (see `index.html`), so a
+visitor needs normal outbound network; collect/train/quantize/export work offline,
+verify and live inference need the CDN.
+
+Two studio-only fixes were needed to build on a studio-rooted deploy (where only
+`studio/`'s deps are installed, not the repo root's), both in invariant form below:
+
+1. The deploy build is `vite build`, not `vue-tsc --noEmit && vite build`. Running
+   `vue-tsc` re-typechecked the whole aliased library and demanded the library's
+   own dev deps (flatbuffers and tfjs-tflite type decls). Typecheck stays a
+   separate `npm run typecheck`.
+2. `flatbuffers` is a studio dependency AND in `resolve.dedupe`. The library source
+   at `../src` imports it at runtime; the bundler resolves that import relative to
+   `../src` (the repo root node_modules, absent on a studio-only install), so
+   deduping forces it to the studio's own copy, the same trick used for tfjs.
+
 ## Layout
 
 ```
 studio/
   index.html                 loads the tfjs and tfjs-tflite CDN globals, the fonts
-  vite.config.ts             alias tensorflow-web -> ../src/index.ts, tfjs dedupe
+  vite.config.ts             alias tensorflow-web -> ../src/index.ts; tfjs and
+                             flatbuffers dedupe; tfjs-tflite external
   src/
     main.ts App.vue router.ts
-    design/ tokens.css base.css components/Tw*.vue   (18 components)
+    design/ tokens.css base.css components/Tw*.vue   (20 components, incl. TwConfirm)
     stages/ Data Features Model Train Test Export Playground views
     stores/ project.ts training.ts settings.ts          (Pinia)
     composables/  the only place that touches the library and browser devices:
@@ -212,6 +232,12 @@ These were each a bug or a near miss. Keep them true.
    the exported bundle must derive their config (notably the audio clip length)
    from `featureCfg`, or a settings change after training silently feeds the model
    input it was not trained on.
+16. The deploy must build from `studio/` alone (the repo root's deps are not
+   installed there). Keep `build` as `vite build` only (not `vue-tsc && vite build`,
+   which re-typechecks the library and needs its dev deps), and keep `flatbuffers`
+   both as a studio dependency and in `resolve.dedupe` so the library's runtime
+   import resolves from the studio's node_modules. Verified by building with the
+   repo-root `flatbuffers` hidden.
 
 ## Hard boundary with the library
 
